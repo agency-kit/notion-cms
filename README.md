@@ -15,7 +15,7 @@ we can provide lots of features that make content from notion and using it in yo
 - [x] Basic CMS
 - [ ] Aliasable component mapping (using notion callouts)
 - [ ] tag filtering
-- [ ] route generation for SSG
+- [x] route generation for SSG
 - [ ] automatic image optimization (unsplash images are massive by default)
 - [ ] plugin system for custom transformations?
 - [ ] minimal caching system (leverages api.AgencyKit.so)

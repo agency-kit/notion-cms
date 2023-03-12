@@ -1,13 +1,13 @@
 {
-  "name": "notion-cms",
+  "name": "@agency-kit/notion-cms",
   "version": "0.1.0",
   "description": "turn notion into a content management system with this utility set.",
-  "main": "index.js",
+  "main": "dist/index.js",
   "type": "module",
   "scripts": {
     "dev": "tsc --watch",
     "build": "rollup -c",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\""
   },
   "repository": {
     "type": "git",
