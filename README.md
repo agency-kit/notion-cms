@@ -19,4 +19,5 @@ we can provide lots of features that make content from notion and using it in yo
 - [ ] automatic image optimization (unsplash images are massive by default)
 - [ ] plugin system for custom transformations?
 - [ ] minimal caching system (leverages api.AgencyKit.so)
+- [ ] virtual file system for use on clientSide?
  

@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "turn notion into a content management system with this utility set.",
   "main": "index.js",
+  "type": "module",
   "scripts": {
+    "dev": "tsc --watch",
+    "build": "rollup -c",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -26,10 +29,19 @@
     "@notion-stuff/blocks-html-parser": "^6.0.0",
     "@notion-stuff/blocks-markdown-parser": "^6.0.0",
     "@notionhq/client": "^2.2.3",
-    "lodash": "^4.17.21"
+    "@rollup/plugin-terser": "^0.4.0",
+    "esbuild": "^0.17.11",
+    "highlight.js": "^11.7.0",
+    "lodash": "^4.17.21",
+    "rollup": "^3.19.1",
+    "rollup-plugin-esbuild": "^5.0.0",
+    "tsc": "^2.0.4"
   },
   "devDependencies": {
     "@notion-stuff/v4-types": "^6.0.0",
+    "@types/lodash": "^4.14.191",
+    "dotenv": "^16.0.3",
+    "terser": "^5.16.6",
     "uvu": "^0.5.6"
   }
 }

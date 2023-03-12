@@ -1,12 +1,15 @@
 import { Client, isFullPage } from "@notionhq/client"
 import {PageObjectResponse,
   DatabaseObjectResponse, 
-  TextRichTextItemResponse} from '@notionhq/client/build/src/api-endpoints'
+  TextRichTextItemResponse, UserObjectResponse} from '@notionhq/client/build/src/api-endpoints'
 import { NotionBlocksHtmlParser } from '@notion-stuff/blocks-html-parser'
 import {Blocks} from '@notion-stuff/v4-types'
-import type { PageEntry, CMS, PageContent, TitleDatabasePropertyConfigResponse} from "./types"
+import type { PageEntry, CMS, PageContent, Page, Route, Cover, PageObjectTitle, PageObjectRelation, PageObjectUser} from "./types"
 import _ from 'lodash'
 import fs from 'fs'
+
+const COVER_IMAGE_REGEX = /<figure notion-figure>[\s\S]+<img[^>]*src=['|"](https?:\/\/[^'|"]+)(?:['|"])/
+
 
 Object.defineProperty(String.prototype, "slug", {
   get: function() {
@@ -26,7 +29,7 @@ export default class NotionCMS {
   notionClient: Client
   parser: NotionBlocksHtmlParser
 
-  constructor(databaseID, notionAPIKey) {
+  constructor(databaseID: string, notionAPIKey: string) {
     this.cms = {
       metadata: {},
       routes: [],
@@ -39,47 +42,51 @@ export default class NotionCMS {
     this.parser = NotionBlocksHtmlParser.getInstance()
   }
 
-  _isTopLevelDir (response: DatabaseObjectResponse | PageObjectResponse): boolean {
-    return _.isEmpty(response?.properties['parent-page']['relation'])
+  _isTopLevelDir (response: PageObjectResponse): boolean {
+    const parentPage = response?.properties['parent-page'] as PageObjectRelation 
+    return _.isEmpty(parentPage.relation)
   }
   
-  _getBlockName(response: DatabaseObjectResponse | PageObjectResponse): string {
-    return ((response?.properties.name['title'] as TitleDatabasePropertyConfigResponse)['title'][0] as TextRichTextItemResponse)?.plain_text
+  _getBlockName(response: PageObjectResponse): string {
+    const nameProp = response?.properties.name as PageObjectTitle 
+    return nameProp.title[0]?.plain_text
   }
 
   async _getAuthorData(page: PageObjectResponse): Promise<Array<string>> {
-    const authorIds = page.properties?.Author?.['people']
+    const authorProp = page.properties?.Author as PageObjectUser
+    const authorIds = authorProp['people']
     let authors;
     if (authorIds?.length) {
       authors = await Promise.all(
-        authorIds.map(async (author) => await this.notionClient.users.retrieve({ user_id: author.id }))
+        authorIds.map(async (author: UserObjectResponse) => await this.notionClient.users.retrieve({ user_id: author.id }))
       ).then(res => {
         if (res?.length) {
-          return res.map(author => author.name)
+          return res.map(author => author.name as string)
         }
       })
+      return authors || []
     }
-    return authors
+    return []
   }
 
-  _findKey(object: object, key: string): object {
+  _findKey(object: Record<string, object>, key: string): Record<string, object> | undefined {
     let value;
-    Object.keys(object).some(function (k) {
+    Object.keys(object).some((k: string) => {
       if (k === key) {
         value = object[k];
         return true;
       }
       if (object[k] && typeof object[k] === 'object') {
-        value = this._findKey(object[k], key);
+        value = this._findKey(object[k] as Record<string, object>, key);
         return value !== undefined;
       }
     });
     return value;
   }
 
-  async _getPageContent(subPage: PageObjectResponse): Promise<PageContent> {
+  async _getPageContent(subPage: PageObjectResponse | PageObjectRelation): Promise<PageContent> {
     let page;
-    if (subPage.object === 'page') {
+    if ((subPage as PageObjectResponse)?.object === 'page') {
       page = subPage
     } else {
       page = await this.notionClient.pages.retrieve({
@@ -94,17 +101,29 @@ export default class NotionCMS {
   
     const parsed = this.parser.parse(pageContent.results as Blocks)
   
-    const coverImageRegex = /<figure notion-figure>[\s\S]+<img[^>]*src=['|"](https?:\/\/[^'|"]+)(?:['|"])/
-  
     // Fall back to the first image in the page if one exists.
+    if (isFullPage(page as PageObjectResponse)) {
+      const pageCoverProp = (page as PageObjectResponse)?.cover as Cover
+      let coverImage;
+      if (pageCoverProp && 'external' in pageCoverProp) {
+        coverImage = pageCoverProp?.external?.url
+      } else if (pageCoverProp?.file){
+        coverImage = pageCoverProp?.file.url 
+      } else {
+       coverImage = parsed.match(COVER_IMAGE_REGEX)?.[1]
+      }
   
-    const coverImage = page && page?.cover?.external?.url || page?.cover?.file.url || parsed.match(coverImageRegex)?.[1]
-  
-    return {
-      name: this._getBlockName(page).slug,
-      authors: await this._getAuthorData(page),
-      coverImage,
-      content: parsed
+      return {
+        name: this._getBlockName(page as PageObjectResponse).slug,
+        authors: await this._getAuthorData(page as PageObjectResponse),
+        coverImage,
+        content: parsed
+      }
+    } else return {
+      name: '',
+      authors: [],
+      coverImage: new URL(''),
+      content: ''
     }
   }
 
@@ -115,7 +134,7 @@ export default class NotionCMS {
   
     const pendingEntries = new Set<PageEntry>()
   
-    const findInPending = (entry, pendingEntries) => {
+    const findInPending = (entry: PageObjectResponse, pendingEntries: Set<PageEntry>) => {
       let match
       pendingEntries.forEach(pendingEntry => {
         if (entry === pendingEntry.entry) {
@@ -126,7 +145,8 @@ export default class NotionCMS {
     }
   
     const addSubPage = async (entry: PageObjectResponse): Promise<void> => {
-      const parent = entry.properties['parent-page']['relation'][0]
+      const parentPageProp = entry.properties['parent-page'] as PageObjectRelation
+      const parent = parentPageProp.relation[0]
       // how to avoid this async call? It causes the process to take quite a long time.
       const parentPage = await this.notionClient.pages.retrieve({ page_id: parent.id })
       if (isFullPage(parentPage)) {
@@ -138,7 +158,7 @@ export default class NotionCMS {
           if (!updateKey[content.name.route]) updateKey[content.name.route] = content
     
           const match = findInPending(entry, pendingEntries)
-          pendingEntries.delete(match)
+          if (match) pendingEntries.delete(match)
         } else {
           let shouldAdd = true
           for (const pendingEntry of pendingEntries) {
@@ -160,9 +180,11 @@ export default class NotionCMS {
       if (this._isTopLevelDir(entry)) {
         const content = await this._getPageContent(entry)
         const currentDir = this.cms.siteData[this._getBlockName(entry).slug.route] = { ...content }
-        if (entry.properties['sub-page']['relation'].length) {
-          for await (const subPage of entry.properties['sub-page']['relation']) {
+        const subPageProp = entry.properties['sub-page'] as PageObjectRelation
+        if (subPageProp.relation.length) {
+          for await (const subPage of subPageProp.relation as PageObjectRelation[]) {
             const content = await this._getPageContent(subPage)
+            // @ts-ignore This one is annoying - it doesn't like the Route Type even thought it is correct. I am sure I am smarter than the TS compiler.
             currentDir[content.name.route] = content
           }
         }

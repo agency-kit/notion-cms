@@ -1,4 +1,4 @@
-import {PageObjectResponse, DatabaseObjectResponse } from '@notionhq/client/build/src/api-endpoints'
+import {PageObjectResponse, DatabaseObjectResponse, RichTextItemResponse } from '@notionhq/client/build/src/api-endpoints'
 
 
 declare global {
@@ -26,8 +26,21 @@ export type PageContent = {
   content: string,
 }
 
-export type Page = PageContent | PageContent & {
+export type Route = {
   [key: string]: PageContent
 }
 
-export type TitleDatabasePropertyConfigResponse = DatabaseObjectResponse['properties']['name']
+export type Page = PageContent | (PageContent & Route)
+
+// Directly stolen from PageObjectResponse Record Type in notionClient/API-endpoints.ts
+export type PageObjectTitle = { type: "title"; title: Array<RichTextItemResponse>; id: string }
+
+export type PageObjectRelation = { type: "relation"; relation: Array<{ id: string }>; id: string }
+
+export type PageObjectUser = {
+  type: "people"
+  people: Array<PartialUserObjectResponse | UserObjectResponse>
+  id: string
+}
+
+export type Cover = { type: "external"; external: { url: TextRequest } } | { type: "file"; file: { url: string; expiry_time: string } } | null
