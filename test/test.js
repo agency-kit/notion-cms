@@ -11,3 +11,5 @@ const testCMS = new NotionCMS(
 const cms = await testCMS.fetchCms()
 
 console.log(cms, 'CMS OUTPUT')
+
+console.log(testCMS.routes, 'ROTUES')

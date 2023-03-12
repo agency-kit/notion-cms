@@ -4,7 +4,7 @@ import {PageObjectResponse,
   TextRichTextItemResponse, UserObjectResponse} from '@notionhq/client/build/src/api-endpoints'
 import { NotionBlocksHtmlParser } from '@notion-stuff/blocks-html-parser'
 import {Blocks} from '@notion-stuff/v4-types'
-import type { PageEntry, CMS, PageContent, Page, Route, Cover, PageObjectTitle, PageObjectRelation, PageObjectUser} from "./types"
+import type { PageEntry, CMS, PageContent, RouteObject, Cover, PageObjectTitle, PageObjectRelation, PageObjectUser} from "./types"
 import _ from 'lodash'
 import fs from 'fs'
 
@@ -40,6 +40,38 @@ export default class NotionCMS {
       auth: notionAPIKey
     })
     this.parser = NotionBlocksHtmlParser.getInstance()
+  }
+
+  get routes() {
+    if (_.isEmpty(this.cms.siteData)) return
+    if (this.toplevelDirectories) {
+      this.toplevelDirectories.forEach(tld => {
+        this.cms.routes.push(this._genRoutes(tld))
+      })
+      return this.cms.routes = this.cms.routes.flat()
+    }
+  }
+
+  get toplevelDirectories() {
+    if (_.isEmpty(this.cms.siteData)) return
+    return Object.entries(this.cms.siteData)
+  }
+
+  _genRoutes(directory: RouteObject): Array<string> {
+    const results = []
+    const routePart = directory[0]
+    const routeChildren = _(directory[1]).pickBy((value, key) => _.startsWith(key, '/')).entries().value()
+    if (!routeChildren.length) return [routePart]
+    routeChildren.forEach(childDirectory => {
+      const childRes = this._genRoutes(childDirectory)
+      if (childRes.length) {
+        childRes.forEach(res => results.push(routePart + res))
+      } else {
+        results.push(routePart + childRes)
+      }
+    })
+    results.push(routePart)
+    return results
   }
 
   _isTopLevelDir (response: PageObjectResponse): boolean {
@@ -203,6 +235,4 @@ export default class NotionCMS {
     console.log('complete')
     return this.cms
   }
-
-
 }
