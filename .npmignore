@@ -1,3 +1,6 @@
 test/
+debug/
 src/
 .env
+tsconfig.json
+rollup.config.js

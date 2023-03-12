@@ -1,5 +1,5 @@
 import { Client, isFullPage } from "@notionhq/client"
-import {PageObjectResponse, UserObjectResponse} from '@notionhq/client/build/src/api-endpoints'
+import {PageObjectResponse, UserObjectResponse, GetPageResponse} from '@notionhq/client/build/src/api-endpoints'
 import { NotionBlocksHtmlParser } from '@notion-stuff/blocks-html-parser'
 import {Blocks} from '@notion-stuff/v4-types'
 import type { PageEntry, CMS, PageContent, RouteObject, Cover, PageObjectTitle, PageObjectRelation, PageObjectUser} from "./types"
@@ -21,28 +21,45 @@ Object.defineProperty(String.prototype, "route", {
   }
 })
 
+interface Options {
+  databaseId: string,
+  notionAPIKey: string,
+}
+
 export default class NotionCMS {
   cms: CMS
   cmsId: string
   notionClient: Client
   parser: NotionBlocksHtmlParser
+  pendingEntries: Set<PageEntry>
+  pageRetrievalCache: Record<string, GetPageResponse>
 
-  constructor(databaseID: string, notionAPIKey: string) {
+  constructor({databaseId, notionAPIKey}: Options = {databaseId : '', notionAPIKey: ''}) {
     this.cms = {
       metadata: {},
       routes: [],
+      tags: [],
+      tagGroups: {},
       siteData: {}
     }
-    this.cmsId = databaseID
+    this.cmsId = databaseId
     this.notionClient = new Client({
       auth: notionAPIKey
     })
     this.parser = NotionBlocksHtmlParser.getInstance()
+    this.pendingEntries = new Set<PageEntry>()
+    this.pageRetrievalCache = {}
+  }
+
+  get data() {
+    if (_.isEmpty(this.cms.siteData)) return
+    return this.cms.siteData
   }
 
   get routes() {
     if (_.isEmpty(this.cms.siteData)) return
     if (this.toplevelDirectories) {
+      this.cms.routes = []
       this.toplevelDirectories.forEach(tld => {
         this.cms.routes.push(this._genRoutes(tld))
       })
@@ -70,6 +87,10 @@ export default class NotionCMS {
     })
     results.push(routePart)
     return results
+  }
+
+  _clearPageRetrievalCache(): void {
+    this.pageRetrievalCache = {}
   }
 
   _isTopLevelDir (response: PageObjectResponse): boolean {
@@ -119,9 +140,7 @@ export default class NotionCMS {
     if ((subPage as PageObjectResponse)?.object === 'page') {
       page = subPage
     } else {
-      page = await this.notionClient.pages.retrieve({
-        page_id: subPage.id
-      })
+      page = await this._retrievePage(subPage.id)
     }
   
     const pageContent = await this.notionClient.blocks.children.list({
@@ -157,54 +176,65 @@ export default class NotionCMS {
     }
   }
 
-  async fetchCms(): Promise<CMS> {
-    const db = await this.notionClient.databases.query({
-      database_id: this.cmsId,
-    });
-  
-    const pendingEntries = new Set<PageEntry>()
-  
-    const findInPending = (entry: PageObjectResponse, pendingEntries: Set<PageEntry>) => {
-      let match
-      pendingEntries.forEach(pendingEntry => {
-        if (entry === pendingEntry.entry) {
-          match = pendingEntry
-        }
-      })
-      return match
+  _findInPending(entry: PageObjectResponse, pendingEntries: Set<PageEntry>) {
+    let match
+    this.pendingEntries.forEach(pendingEntry => {
+      if (entry === pendingEntry.entry) {
+        match = pendingEntry
+      }
+    })
+    return match
+  }
+
+  async _retrievePage(id: string): Promise<GetPageResponse> {
+    let parentPage = this.pageRetrievalCache[id]
+    // Check cache before making this call.
+    if (!parentPage) {
+      parentPage = await this.notionClient.pages.retrieve({ page_id: id })
+      this.pageRetrievalCache[id] = parentPage
     }
+    return parentPage
+  }
+
+  async _addSubPage(entry: PageObjectResponse): Promise<void> {
+    const parentPageProp = entry.properties['parent-page'] as PageObjectRelation
+    const parent = parentPageProp.relation[0]
+    let parentPage = await this._retrievePage(parent.id)
+
+    if (isFullPage(parentPage)) {
+      const parentName = this._getBlockName(parentPage).slug.route
+      const updateKey = this._findKey(this.cms.siteData, parentName)
   
-    const addSubPage = async (entry: PageObjectResponse): Promise<void> => {
-      const parentPageProp = entry.properties['parent-page'] as PageObjectRelation
-      const parent = parentPageProp.relation[0]
-      // how to avoid this async call? It causes the process to take quite a long time.
-      const parentPage = await this.notionClient.pages.retrieve({ page_id: parent.id })
-      if (isFullPage(parentPage)) {
-        const parentName = this._getBlockName(parentPage).slug.route
-        const updateKey = this._findKey(this.cms.siteData, parentName)
-    
-        if (updateKey) {
-          const content = await this._getPageContent(entry)
-          if (!updateKey[content.name.route]) updateKey[content.name.route] = content
-    
-          const match = findInPending(entry, pendingEntries)
-          if (match) pendingEntries.delete(match)
-        } else {
-          let shouldAdd = true
-          for (const pendingEntry of pendingEntries) {
-            if (_.isEqual(entry, pendingEntry.entry)) {
-              shouldAdd = false; break;
-            };
-          }
-          if (shouldAdd) {
-            pendingEntries.add({
-              parentName,
-              entry
-            })
-          }
+      if (updateKey) {
+        const content = await this._getPageContent(entry)
+        if (!updateKey[content.name.route]) updateKey[content.name.route] = content
+  
+        const match = this._findInPending(entry, this.pendingEntries)
+        if (match) this.pendingEntries.delete(match)
+      } else {
+        let shouldAdd = true
+        for (const pendingEntry of this.pendingEntries) {
+          if (_.isEqual(entry, pendingEntry.entry)) {
+            shouldAdd = false; break;
+          };
+        }
+        if (shouldAdd) {
+          this.pendingEntries.add({
+            parentName,
+            entry
+          })
         }
       }
     }
+  }
+
+  async fetch(): Promise<CMS> {
+    // For now clear the cache anytime we re-run the fetch. In the future we want to make the cache clearing dynamically based on 
+    // an AgencyKit API flag.
+    this._clearPageRetrievalCache()
+    const db = await this.notionClient.databases.query({
+      database_id: this.cmsId,
+    });
   
     for await (const entry of db.results as PageObjectResponse[]) {
       if (this._isTopLevelDir(entry)) {
@@ -219,14 +249,15 @@ export default class NotionCMS {
           }
         }
       } else {
-        await addSubPage(entry)
+        await this._addSubPage(entry)
       }
     }
-    while (pendingEntries.size) {
-      console.log('trigger while', pendingEntries.size)
-      for await (const pendingEntry of pendingEntries) {
+
+    while (this.pendingEntries.size) {
+      console.log('trigger while', this.pendingEntries.size)
+      for await (const pendingEntry of this.pendingEntries) {
         console.log(pendingEntry.parentName)
-        await addSubPage(pendingEntry.entry)
+        await this._addSubPage(pendingEntry.entry)
         fs.writeFileSync('debug/site-data.json', JSON.stringify(this.cms.siteData))
       }
     }

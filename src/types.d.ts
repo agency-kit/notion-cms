@@ -16,6 +16,8 @@ export interface PageEntry {
 export interface CMS {
   metadata?: {},
   routes: Array<string | Array>,
+  tags: Array<string>,
+  tagGroups: Record<string, Array<string>>
   siteData: Record<string, Page>
 }
 
