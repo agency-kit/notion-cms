@@ -1,0 +1,35 @@
+{
+  "name": "notion-cms",
+  "version": "0.1.0",
+  "description": "turn notion into a content management system with this utility set.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agency-kit/notion-cms.git"
+  },
+  "keywords": [
+    "notion",
+    "content",
+    "management",
+    "cms"
+  ],
+  "author": "Jacob Milhorn",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/agency-kit/notion-cms/issues"
+  },
+  "homepage": "https://github.com/agency-kit/notion-cms#readme",
+  "dependencies": {
+    "@notion-stuff/blocks-html-parser": "^6.0.0",
+    "@notion-stuff/blocks-markdown-parser": "^6.0.0",
+    "@notionhq/client": "^2.2.3",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@notion-stuff/v4-types": "^6.0.0",
+    "uvu": "^0.5.6"
+  }
+}
