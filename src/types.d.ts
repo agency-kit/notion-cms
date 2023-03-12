@@ -15,7 +15,7 @@ export interface PageEntry {
 
 export interface CMS {
   metadata?: {},
-  routes: Array<string>,
+  routes: Array<string | Array>,
   siteData: Record<string, Page>
 }
 
@@ -44,3 +44,6 @@ export type PageObjectUser = {
 }
 
 export type Cover = { type: "external"; external: { url: TextRequest } } | { type: "file"; file: { url: string; expiry_time: string } } | null
+
+export type RouteObject = [string, object]
+
