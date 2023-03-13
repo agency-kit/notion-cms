@@ -1,4 +1,4 @@
-import {PageObjectResponse, DatabaseObjectResponse, RichTextItemResponse } from '@notionhq/client/build/src/api-endpoints'
+import {PageObjectResponse, DatabaseObjectResponse, RichTextItemResponse, SelectPropertyResponse } from '@notionhq/client/build/src/api-endpoints'
 
 
 declare global {
@@ -24,6 +24,7 @@ export interface CMS {
 export type PageContent = {
   name: string,
   authors: Array<string>,
+  tags: Array<string>,
   coverImage: URL,
   content: string,
 }
@@ -42,6 +43,12 @@ export type PageObjectRelation = { type: "relation"; relation: Array<{ id: strin
 export type PageObjectUser = {
   type: "people"
   people: Array<PartialUserObjectResponse | UserObjectResponse>
+  id: string
+}
+
+export type PageMultiSelect = {
+  type: "multi_select"
+  multi_select: Array<SelectPropertyResponse>
   id: string
 }
 

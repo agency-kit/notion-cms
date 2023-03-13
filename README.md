@@ -19,7 +19,7 @@ See https://cooked-shovel-3c3.notion.site/Community-e9fce377adb1425da8ac3ef3acef
 - [x] Basic CMS
 - [x] route generation for SSG
 - [ ] Aliasable component mapping (using notion callouts)
-- [ ] tag grouping and filtering
+- [x] tag grouping and filtering
 - [ ] arbitrary notion properties handling
 - [ ] Layout definitions and ability to add custom layouts
 - [ ] custom paths
@@ -40,19 +40,19 @@ See https://cooked-shovel-3c3.notion.site/Community-e9fce377adb1425da8ac3ef3acef
 
 ```javascript
 
+// initialize
 const myCoolCMS = new NotionCMS({
   databaseId: 'e4fcd5b3-1d6a-4afd-b951-10d56ce436ad',
   notionAPIKey: process.env.NOTION
 })
 
+// Pull down all Notion content
 myCoolCMS.fetch()
 
 // Access the routes here:
-
 console.log(myCoolCMS.routes)
 
 // Access the page content here:
-
 console.log(myCoolCMS.data)
 
 ```

@@ -13,7 +13,8 @@ dotenv.config()
 
 const testCMS = new NotionCMS({
   databaseId: 'e4fcd5b3-1d6a-4afd-b951-10d56ce436ad',
-  notionAPIKey: process.env.NOTION
+  notionAPIKey: process.env.NOTION,
+  debug: true
 })
 
 await testCMS.fetch()
@@ -42,24 +43,28 @@ const expectedRoutes = [
 const expectedSiteData = {
   '/about': {
     name: 'about',
-    authors: ['Jacob Milhorn'],
+    authors: ['Jacob'],
+    tags: [],
     content: '',
     coverImage: undefined
   },
   '/team': {
     name: 'team',
     authors: [],
+    tags: [],
     content: '',
     coverImage: undefined,
     '/mortimer': {
       name: 'mortimer',
       authors: [],
+      tags: [],
       content: '',
       coverImage: undefined
     },
     '/jacob': {
       name: 'jacob',
       authors: [],
+      tags: [],
       content: '',
       coverImage: undefined
     }
@@ -67,28 +72,49 @@ const expectedSiteData = {
   '/pricing': {
     name: 'pricing',
     authors: [],
+    tags: [],
     content: '',
     coverImage: undefined
   },
   '/posts': {
     name: 'posts',
-    authors: ['Jacob Milhorn'],
+    authors: ['Jacob'],
+    tags: [],
     content: '',
     coverImage: undefined,
     '/how-to-use-notion-cms': {
       name: 'how-to-use-notion-cms',
       authors: [],
+      tags: ['blog', 'notion', 'javascript'],
       content: '',
       coverImage: undefined
     },
     '/how-to-build-a-blog-with-notion': {
       name: 'how-to-build-a-blog-with-notion',
       authors: [],
+      tags: ['blog', 'notion'],
       content: '',
       coverImage: undefined
     }
   }
 }
+
+const expectedTaggedCollection = [
+  {
+    name: 'how-to-build-a-blog-with-notion',
+    authors: [],
+    tags: ['blog', 'notion'],
+    coverImage: undefined,
+    content: ''
+  },
+  {
+    name: 'how-to-use-notion-cms',
+    authors: [],
+    tags: ['blog', 'notion', 'javascript'],
+    coverImage: undefined,
+    content: ''
+  },
+]
 
 test('routes', () => {
   assert.equal(testCMS.routes.sort(), expectedRoutes.sort())
@@ -99,6 +125,12 @@ test('siteData', () => {
   const filtered = structuredClone(testCMS.cms.siteData)
   removeContent(filtered)
   assert.equal(filtered, expectedSiteData)
+})
+
+test('taggedCollection', () => {
+  const results = testCMS.getTaggedCollection(['notion', 'javascript'])
+  results.forEach(result => removeContent(result))
+  assert.equal(results, expectedTaggedCollection)
 })
 
 test.run();

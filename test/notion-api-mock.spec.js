@@ -360,11 +360,11 @@ nock(baseUrl)
               {
                 "object": "user",
                 "id": "4e38fa57-609c-4beb-8e28-271b11cc81a3",
-                "name": "Jacob Milhorn",
+                "name": "Jacob",
                 "avatar_url": null,
                 "type": "person",
                 "person": {
-                  "email": "jacob.milhorn@gmail.com"
+                  "email": "jacob@agencykit.so"
                 }
               }
             ]
@@ -985,11 +985,11 @@ nock(baseUrl)
               {
                 "object": "user",
                 "id": "4e38fa57-609c-4beb-8e28-271b11cc81a3",
-                "name": "Jacob Milhorn",
+                "name": "Jacob",
                 "avatar_url": null,
                 "type": "person",
                 "person": {
-                  "email": "jacob.milhorn@gmail.com"
+                  "email": "jacob@agencykit.so"
                 }
               }
             ]
@@ -1085,11 +1085,11 @@ nock(baseUrl)
   .reply(200, {
     "object": "user",
     "id": "4e38fa57-609c-4beb-8e28-271b11cc81a3",
-    "name": "Jacob Milhorn",
+    "name": "Jacob",
     "avatar_url": null,
     "type": "person",
     "person": {
-      "email": "jacob.milhorn@gmail.com"
+      "email": "jacob@agencykit.so"
     }
   })
 
@@ -1446,11 +1446,11 @@ nock(baseUrl)
           {
             "object": "user",
             "id": "4e38fa57-609c-4beb-8e28-271b11cc81a3",
-            "name": "Jacob Milhorn",
+            "name": "Jacob",
             "avatar_url": null,
             "type": "person",
             "person": {
-              "email": "jacob.milhorn@gmail.com"
+              "email": "jacob@agencykit.so"
             }
           }
         ]
@@ -2091,11 +2091,11 @@ nock(baseUrl)
           {
             "object": "user",
             "id": "4e38fa57-609c-4beb-8e28-271b11cc81a3",
-            "name": "Jacob Milhorn",
+            "name": "Jacob",
             "avatar_url": null,
             "type": "person",
             "person": {
-              "email": "jacob.milhorn@gmail.com"
+              "email": "jacob@agencykit.so"
             }
           }
         ]
