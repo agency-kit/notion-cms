@@ -31,7 +31,8 @@ Object.defineProperty(String.prototype, "route", {
 interface Options {
   databaseId: string,
   notionAPIKey: string,
-  debug?: boolean
+  debug?: boolean,
+  rootUrl?: string | URL | undefined // Used to generate full path links
 }
 
 export default class NotionCMS {
@@ -43,9 +44,11 @@ export default class NotionCMS {
   pageRetrievalCache: Record<string, GetPageResponse>
   debug: boolean | undefined
 
-  constructor({databaseId, notionAPIKey, debug}: Options = {databaseId : '', notionAPIKey: '', debug: false}) {
+  constructor({databaseId, notionAPIKey, debug, rootUrl}: Options = {databaseId : '', notionAPIKey: '', debug: false, rootUrl: ''}) {
     this.cms = {
-      metadata: {},
+      metadata: {
+        root: rootUrl ? new URL(rootUrl) : ''
+      },
       routes: [],
       tags: [],
       tagGroups: {},
