@@ -1,4 +1,4 @@
-import NotionCMS from '../dist/index.js'
+import NotionCMS from '../dist/index.mjs'
 import dotenv from 'dotenv'
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';

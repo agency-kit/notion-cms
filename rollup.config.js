@@ -4,9 +4,8 @@ import terser from '@rollup/plugin-terser'
 export default {
   input: 'src/notion-cms.ts',
   plugins: [esbuild(), terser()],
-  output: {
-    file: 'dist/index.js',
-    format: 'esm',
-    sourcemap: true,
-  }
+  output: [
+    { format: 'esm', file: './dist/index.mjs' },
+    { format: 'cjs', file: './dist/index.js' },
+  ]
 };
