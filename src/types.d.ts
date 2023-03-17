@@ -14,16 +14,31 @@ export interface PageEntry {
 }
 
 export interface CMS {
-  metadata?: {},
+  metadata: {
+    rootUrl?: string | URL | undefined,
+    databaseId: string
+  },
   routes: Array<string | Array>,
   tags: Array<string>,
   tagGroups: Record<string, Array<string>>
+  transient?: Record<string, Transient>
   siteData: Record<string, Page>
+}
+
+export type Transient = {
+  name: string,
+  parentPage: string | undefined,
+  authorIds: Array<string> | undefined
+}
+
+export interface pendingEntry {
+  id: string,
+  entry: Transient
 }
 
 export type PageContent = {
   name: string,
-  authors: Array<string>,
+  authors?: Array<string>,
   tags: Array<string>,
   coverImage: URL,
   content: string,
