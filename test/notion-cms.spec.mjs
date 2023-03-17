@@ -6,7 +6,7 @@ import * as assert from 'uvu/assert';
 const noMock = process.argv[2]
 
 if (!noMock) {
-  await import('./notion-api-mock.spec.js')
+  await import('./notion-api-mock.spec.mjs')
 }
 
 dotenv.config()
