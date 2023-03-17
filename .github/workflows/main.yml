@@ -1,0 +1,11 @@
+on:
+  pull_request:
+    branches:
+    - main
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: My first step
+        run: npm install && npm run test
+  
