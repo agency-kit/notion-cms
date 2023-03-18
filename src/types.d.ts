@@ -1,6 +1,5 @@
 import {PageObjectResponse, DatabaseObjectResponse, RichTextItemResponse, SelectPropertyResponse } from '@notionhq/client/build/src/api-endpoints'
 
-
 declare global {
   interface String {
     route: string,
@@ -14,6 +13,7 @@ export interface PageEntry {
 }
 
 export interface CMS {
+  stages: Array<string>,
   metadata: {
     rootUrl?: string | URL | undefined,
     databaseId: string
@@ -28,7 +28,6 @@ export interface CMS {
 export type Transient = {
   name: string,
   parentPage: string | undefined,
-  authorIds: Array<string> | undefined
 }
 
 export interface pendingEntry {
