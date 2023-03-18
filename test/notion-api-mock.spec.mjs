@@ -15,7 +15,96 @@ const pageIds = [
   '232177b4-31ac-4fdb-946b-cdd996add2d2'
 ]
 
+export const expectedRoutes = [
+  '/about',
+  '/team',
+  '/team/mortimer',
+  '/team/jacob',
+  '/pricing',
+  '/posts',
+  '/posts/how-to-use-notion-cms',
+  '/posts/how-to-build-a-blog-with-notion'
+]
+
+export const expectedSiteData = {
+  '/about': {
+    name: 'about',
+    authors: ['Jacob'],
+    tags: [],
+    content: '',
+    coverImage: undefined
+  },
+  '/team': {
+    name: 'team',
+    authors: [],
+    tags: [],
+    content: '',
+    coverImage: undefined,
+    '/mortimer': {
+      name: 'mortimer',
+      authors: [],
+      tags: [],
+      content: '',
+      coverImage: undefined
+    },
+    '/jacob': {
+      name: 'jacob',
+      authors: [],
+      tags: [],
+      content: '',
+      coverImage: undefined
+    }
+  },
+  '/pricing': {
+    name: 'pricing',
+    authors: [],
+    tags: [],
+    content: '',
+    coverImage: undefined
+  },
+  '/posts': {
+    name: 'posts',
+    authors: ['Jacob'],
+    tags: [],
+    content: '',
+    coverImage: undefined,
+    '/how-to-use-notion-cms': {
+      name: 'how-to-use-notion-cms',
+      authors: [],
+      tags: ['blog', 'notion', 'javascript'],
+      content: '',
+      coverImage: undefined
+    },
+    '/how-to-build-a-blog-with-notion': {
+      name: 'how-to-build-a-blog-with-notion',
+      authors: [],
+      tags: ['blog', 'notion'],
+      content: '',
+      coverImage: undefined
+    }
+  }
+}
+
+export const expectedTaggedCollection = [
+  {
+    name: 'how-to-build-a-blog-with-notion',
+    authors: [],
+    tags: ['blog', 'notion'],
+    coverImage: undefined,
+    content: ''
+  },
+  {
+    name: 'how-to-use-notion-cms',
+    authors: [],
+    tags: ['blog', 'notion', 'javascript'],
+    coverImage: undefined,
+    content: ''
+  },
+]
+
+
 nock(baseUrl)
+  .persist()
   .post('/databases/e4fcd5b3-1d6a-4afd-b951-10d56ce436ad/query')
   .reply(200, {
     "object": "list",

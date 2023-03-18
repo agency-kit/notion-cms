@@ -14,7 +14,6 @@ function writeFile(path: string, contents: string) {
 
 const COVER_IMAGE_REGEX = /<figure notion-figure>[\s\S]+<img[^>]*src=['|"](https?:\/\/[^'|"]+)(?:['|"])/
 
-
 Object.defineProperty(String.prototype, "slug", {
   get: function() {
     return _.kebabCase(this)
@@ -31,7 +30,8 @@ interface Options {
   databaseId: string,
   notionAPIKey: string,
   debug?: boolean,
-  rootUrl?: string | URL | undefined // Used to generate full path links
+  rootUrl?: string | URL | undefined // Used to generate full path links,
+  limiter?: {schedule: Function} 
 }
 
 export default class NotionCMS {
@@ -42,13 +42,15 @@ export default class NotionCMS {
   pendingEntries: Set<pendingEntry>
   pageRetrievalCache: Record<string, GetPageResponse>
   debug: boolean | undefined
+  limiter: {schedule: Function} 
 
-  constructor({databaseId, notionAPIKey, debug, rootUrl}: Options = {databaseId : '', notionAPIKey: '', debug: false, rootUrl: ''}) {
-    this.cms = {
+  constructor({databaseId, notionAPIKey, debug, rootUrl, limiter}: Options = {databaseId : '', notionAPIKey: '', debug: false, rootUrl: ''}, previousState: string) {
+    this.cms = previousState && JSON.parse(previousState) || {
       metadata: {
         databaseId,
         rootUrl: rootUrl ? new URL(rootUrl) : ''
       },
+      stages: [],
       routes: [],
       tags: [],
       tagGroups: {},
@@ -63,6 +65,9 @@ export default class NotionCMS {
     this.pendingEntries = new Set<pendingEntry>()
     this.pageRetrievalCache = {}
     this.debug = debug
+    this.limiter = limiter || {schedule: (func: Function) => {const result = func(); return Promise.resolve(result)}}
+
+    this.limiter.schedule.bind(limiter)
   }
 
   get data() {
@@ -107,7 +112,7 @@ export default class NotionCMS {
     this.pageRetrievalCache = {}
   }
 
-  _isTopLevelDir (response: PageObjectResponse): boolean {
+  _isTopLevelDir(response: PageObjectResponse): boolean {
     const parentPage = response?.properties['parent-page'] as PageObjectRelation 
     return _.isEmpty(parentPage.relation)
   }
@@ -160,10 +165,12 @@ export default class NotionCMS {
     const tags = [] as Array<string>
     page = await this._retrievePage(id)
   
-    const pageContent = await this.notionClient.blocks.children.list({
-      block_id: id,
-      page_size: 50,
-    })
+    const pageContent = await this.limiter.schedule(
+      async () => await this.notionClient.blocks.children.list({
+        block_id: id,
+        page_size: 50,
+      })
+    )
     const name = this._getBlockName(page as PageObjectResponse).slug
     const parsed = this.parser.parse(pageContent.results as Blocks)
 
@@ -204,14 +211,16 @@ export default class NotionCMS {
     let parentPage = this.pageRetrievalCache[id]
     // Check cache before making this call.
     if (!parentPage) {
-      parentPage = await this.notionClient.pages.retrieve({ page_id: id })
+      parentPage = await this.limiter.schedule(
+        async () => await this.notionClient.pages.retrieve({ page_id: id })
+      )
       this.pageRetrievalCache[id] = parentPage
     }
     return parentPage
   }
 
   async _addPage(entry: Transient, id:string, siteData: CMS['siteData']): Promise<void> {
-    let page, name, parentPage, parentName, updateObject;
+    let page, name, authors, parentPage, parentName, updateObject;
     const parentId = entry.parentPage
 
     if (parentId){
@@ -222,7 +231,7 @@ export default class NotionCMS {
       name = this._getBlockName(page).slug.route
       const authorProp = page.properties?.Author as PageObjectUser
       const authorIds = authorProp['people']
-      entry['authorIds'] = authorIds.map(authorId => authorId.id)
+      authors = authorIds.map(authorId => authorId.name)
       entry['name'] = name
       if (parentPage && isFullPage(parentPage)) {
         parentName = this._getBlockName(parentPage).slug.route
@@ -233,7 +242,7 @@ export default class NotionCMS {
     }
 
     if (updateObject && name) {
-      if (!updateObject[name]) updateObject[name] = {} as Page
+      if (!updateObject[name]) updateObject[name] = {authors} as Page
       const match = this._findInPending(entry)
       if (match) this.pendingEntries.delete(match)
     } else {
@@ -257,7 +266,9 @@ export default class NotionCMS {
     if (authorIds?.length) {
       authors = await Promise.all(
         authorIds.map(async (authorId: string) => {
-        return await this.notionClient.users.retrieve({ user_id: authorId })
+        return await this.limiter.schedule(
+            async () => await this.notionClient.users.retrieve({ user_id: authorId })
+          )
         })
       ).then(res => {
         if (res?.length) {
@@ -280,17 +291,8 @@ export default class NotionCMS {
       updateObject.coverImage = content.coverImage
       updateObject.content = content.content
     }
+    stateWithContent.stages.push('content')
     return stateWithContent
-  }
-
-  async _getAuthors(state: CMS): Promise<CMS> {
-    let stateWithAuthors = _.cloneDeep(state)
-    if (!stateWithAuthors.transient) return stateWithAuthors
-    for await (const [idx, entry] of Object.entries(stateWithAuthors.transient)) {
-      const updateObject = this._findByKey(stateWithAuthors.siteData, entry.name) as Page
-      updateObject.authors = await this._getAuthorData(entry.authorIds as Array<string>)
-    }
-    return stateWithAuthors
   }
 
   async _getPages(state: CMS): Promise<CMS> {
@@ -304,22 +306,23 @@ export default class NotionCMS {
         await this._addPage(pendingEntry.entry, pendingEntry.id, stateWithPages.siteData)
       }
     }
-
+    stateWithPages.stages.push('pages')
     return stateWithPages
   }
 
   async _getDb(state: CMS): Promise<CMS> {
-     let stateWithDb = _.cloneDeep(state)
+    let stateWithDb = _.cloneDeep(state)
     if (!stateWithDb.transient) return stateWithDb
-     const db = await this.notionClient.databases.query({
-      database_id: state.metadata.databaseId,
-    });
-     for await (const entry of db.results as PageObjectResponse[]) {
+    const db = await this.limiter.schedule(
+      async () => await this.notionClient.databases.query({database_id: state.metadata.databaseId})
+    )
+    for await (const entry of db.results as PageObjectResponse[]) {
       // Fetch page: parent-page relationship here and store in transient object.
       let transient = stateWithDb.transient[entry.id] = {name: '', parentPage: '', authorIds: undefined}
       const parentPage = entry.properties['parent-page'] as PageObjectRelation
       if (parentPage) transient['parentPage'] = parentPage.relation[0]?.id
     }
+    stateWithDb.stages.push('db')
     return stateWithDb
   }
 
@@ -327,16 +330,17 @@ export default class NotionCMS {
     // For now clear the cache anytime we re-run the fetch. In the future we want to make the cache clearing dynamically based on 
     // an AgencyKit API flag.
     this._clearPageRetrievalCache()
-       
-    this.cms =
-      await this._getPageContent(
-        await this._getAuthors(
-          await this._getPages(
-            await this._getDb(this.cms)
-          )
-        )
-      )
 
+    if (!_.includes(this.cms.stages, 'db')) {
+        this.cms = await this._getDb(this.cms)
+    }
+    if (!_.includes(this.cms.stages, 'pages')) {
+        this.cms = await this._getPages(this.cms)
+    }
+    if (!_.includes(this.cms.stages, 'content')) {
+        this.cms = await this._getPageContent(this.cms)
+    }
+       
     delete this.cms['transient']
 
     void this.routes
@@ -351,5 +355,9 @@ export default class NotionCMS {
       taggedPages.push(...this.cms.tagGroups[tag])
     }
     return _(taggedPages).map(page => this._findByKey(this.cms.siteData, page)).uniq().value()
+  }
+
+  export() {
+    return JSON.stringify(this.cms)
   }
 }
