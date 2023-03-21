@@ -357,6 +357,12 @@ export default class NotionCMS {
     return _(taggedPages).map(page => this._findByKey(this.cms.siteData, page)).uniq().value()
   }
 
+  filterSubPages(page: Page) {
+    return Object.entries(page)
+      .filter(([key]) => key.startsWith('/'))
+      .map(_.constant)
+  }
+
   export() {
     return JSON.stringify(this.cms)
   }

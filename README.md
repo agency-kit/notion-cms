@@ -4,6 +4,8 @@ turn notion into a full fledged headless CMS with this utility set.
 
 ## Install
 
+Requires `>=node 19`
+
 ``` npm install @agency-kit/notion-cms ```
 
 ## Why.
