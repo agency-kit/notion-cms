@@ -1,6 +1,6 @@
-# Notion CMS
+# _The_ Notion CMS
 
-turn notion into a full fledged CMS with this utility set.
+turn notion into a full fledged headless CMS with this utility set.
 
 ## Install
 
