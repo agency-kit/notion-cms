@@ -1,8 +1,8 @@
 import NotionCMS from '../dist/index.mjs'
 import dotenv from 'dotenv'
-import { suite  } from 'uvu';
+import { suite } from 'uvu';
 import * as assert from 'uvu/assert';
-import {removeContent} from './test-utils.mjs'
+import { removeContent } from './test-utils.mjs'
 
 import { expectedRoutes, expectedTaggedCollection } from './notion-api-mock.spec.mjs';
 
@@ -46,7 +46,7 @@ const startState = {
     '595bf484-5455-41ab-beea-9d1a9d363464': {
       name: "/pricing"
     },
-   'b59e1887-7c2c-4566-afc9-a619271ad56d': {
+    'b59e1887-7c2c-4566-afc9-a619271ad56d': {
       name: "/team"
     },
     '232177b4-31ac-4fdb-946b-cdd996add2d2': {
@@ -56,7 +56,7 @@ const startState = {
   siteData: {}
 }
 
-const afterPagesState =  {
+const afterPagesState = {
   metadata: {
     databaseId: "e4fcd5b3-1d6a-4afd-b951-10d56ce436ad",
     rootUrl: ""
@@ -88,7 +88,7 @@ const afterPagesState =  {
     '595bf484-5455-41ab-beea-9d1a9d363464': {
       name: "/pricing"
     },
-   'b59e1887-7c2c-4566-afc9-a619271ad56d': {
+    'b59e1887-7c2c-4566-afc9-a619271ad56d': {
       name: "/team"
     },
     '232177b4-31ac-4fdb-946b-cdd996add2d2': {
@@ -102,8 +102,8 @@ const afterPagesState =  {
       ],
       '/how-to-build-a-blog-with-notion': {
         authors: [],
-     },
-     '/how-to-use-notion-cms': {
+      },
+      '/how-to-use-notion-cms': {
         authors: [],
       },
     },
@@ -149,6 +149,36 @@ const afterPagesStateJSON = {
   ],
   "tags": [],
   "tagGroups": {},
+  "transient": {
+    '0148a891-e127-48ec-91d2-6213b9167593': {
+      name: "/how-to-build-a-blog-with-notion",
+      parentPage: "226956e8-075d-4f50-bf7f-2c683fd93032"
+    },
+    '5d002c2b-bbf5-409a-b26a-9995a059138f': {
+      name: "/how-to-use-notion-cms",
+      parentPage: "226956e8-075d-4f50-bf7f-2c683fd93032"
+    },
+    '226956e8-075d-4f50-bf7f-2c683fd93032': {
+      name: "/posts"
+    },
+    'd400849b-afc2-4ffe-8150-83005a624192': {
+      name: "/mortimer",
+      parentPage: "b59e1887-7c2c-4566-afc9-a619271ad56d"
+    },
+    '0076e375-3bed-4aa1-97c2-2eea4d58fe93': {
+      name: "/jacob",
+      parentPage: "b59e1887-7c2c-4566-afc9-a619271ad56d"
+    },
+    '595bf484-5455-41ab-beea-9d1a9d363464': {
+      name: "/pricing"
+    },
+    'b59e1887-7c2c-4566-afc9-a619271ad56d': {
+      name: "/team"
+    },
+    '232177b4-31ac-4fdb-946b-cdd996add2d2': {
+      name: "/about"
+    }
+  },
   "siteData": {
     "/posts": {
       "authors": [
@@ -178,10 +208,11 @@ const afterPagesStateJSON = {
         "Jacob"
       ],
     }
-  }
+  },
+  "lastUpdateTimestamp": ""
 }
 
-const afterPullContentState =  {
+const afterPullContentState = {
   metadata: {
     databaseId: "e4fcd5b3-1d6a-4afd-b951-10d56ce436ad",
     rootUrl: ""
@@ -238,7 +269,7 @@ const afterPullContentState =  {
     '595bf484-5455-41ab-beea-9d1a9d363464': {
       name: "/pricing"
     },
-   'b59e1887-7c2c-4566-afc9-a619271ad56d': {
+    'b59e1887-7c2c-4566-afc9-a619271ad56d': {
       name: "/team"
     },
     '232177b4-31ac-4fdb-946b-cdd996add2d2': {
@@ -260,7 +291,7 @@ const afterPullContentState =  {
         content: "",
         coverImage: undefined
       },
-     '/how-to-use-notion-cms': {
+      '/how-to-use-notion-cms': {
         authors: [],
         name: "how-to-use-notion-cms",
         tags: [
@@ -324,7 +355,8 @@ const afterPullContentStateJSON = {
   "stages": [
     "db",
     "pages",
-    "content"
+    "content",
+    "complete"
   ],
   "routes": [
     "/about",
@@ -414,7 +446,8 @@ const afterPullContentStateJSON = {
       "tags": [],
       "content": ""
     }
-  }
+  },
+  "lastUpdateTimestamp": ""
 }
 
 const pullPages = suite('pull-pages')
@@ -424,54 +457,60 @@ const pullPageContent = suite('pull-page-content')
 let pullPagesCMS, pullPageContentCMS
 
 pullPages.before(async () => {
-   pullPagesCMS = new NotionCMS({
-      databaseId: 'e4fcd5b3-1d6a-4afd-b951-10d56ce436ad',
-      notionAPIKey: process.env.NOTION,
-      debug: true
+  pullPagesCMS = new NotionCMS({
+    databaseId: 'e4fcd5b3-1d6a-4afd-b951-10d56ce436ad',
+    notionAPIKey: process.env.NOTION,
+    debug: true
   }, JSON.stringify(startState))
   await pullPagesCMS.fetch()
 })
 
-pullPages('siteData', ()=>{
+pullPages('siteData', () => {
   const filtered = structuredClone(pullPagesCMS.cms.siteData)
-  removeContent(filtered)
+  removeContent(filtered, 'content')
   assert.equal(filtered, afterPagesState.siteData)
 })
 
-pullPages('export JSON', ()=>{
-  assert.equal(pullPagesCMS.export(), JSON.stringify(afterPagesStateJSON).replaceAll(' ', ''))
+pullPages('export JSON', () => {
+  removeContent(pullPagesCMS.cms, 'lastUpdateTimestamp')
+  assert.equal(
+    JSON.stringify(pullPagesCMS.cms),
+    JSON.stringify(afterPagesStateJSON).replaceAll(' ', ''))
 })
 
 pullPageContent.before(async () => {
   pullPageContentCMS = new NotionCMS({
-      databaseId: 'e4fcd5b3-1d6a-4afd-b951-10d56ce436ad',
-      notionAPIKey: process.env.NOTION,
-      debug: true
+    databaseId: 'e4fcd5b3-1d6a-4afd-b951-10d56ce436ad',
+    notionAPIKey: process.env.NOTION,
+    debug: true
   }, JSON.stringify(afterPagesState))
   await pullPageContentCMS.fetch()
 })
 
-pullPageContent('routes', ()=>{
+pullPageContent('routes', () => {
   assert.equal(pullPageContentCMS.routes.sort(), expectedRoutes.sort())
 })
 
-pullPageContent('siteData', ()=>{
+pullPageContent('siteData', () => {
   const filtered = structuredClone(pullPageContentCMS.cms.siteData)
-  removeContent(filtered)
+  removeContent(filtered, 'content')
   assert.equal(filtered, afterPullContentState.siteData)
 })
 
-pullPageContent('taggedCollection', ()=>{
+pullPageContent('taggedCollection', () => {
   const results = pullPageContentCMS.getTaggedCollection(['notion', 'javascript'])
-  results.forEach(result => removeContent(result))
+  results.forEach(result => removeContent(result, 'content'))
   assert.equal(results, expectedTaggedCollection)
 })
 
-pullPageContent('export JSON', ()=> {
+pullPageContent('export JSON', () => {
   const filtered = structuredClone(pullPageContentCMS.cms)
-  removeContent(filtered.siteData)
+  removeContent(filtered.siteData, 'content')
+  removeContent(filtered, 'lastUpdateTimestamp')
   // Export is just JSON stringify right now, just test that
-  assert.equal(JSON.stringify(filtered), JSON.stringify(afterPullContentStateJSON).replaceAll(' ', ''))
+  assert.equal(
+    JSON.stringify(filtered),
+    JSON.stringify(afterPullContentStateJSON).replaceAll(' ', ''))
 })
 
 pullPages.run()

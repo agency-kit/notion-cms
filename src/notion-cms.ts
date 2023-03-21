@@ -5,7 +5,11 @@ import {Blocks} from '@notion-stuff/v4-types'
 import type { Cover, CMS, Page, PageContent, RouteObject, Transient, PageObjectTitle, PageObjectRelation, PageObjectUser, PageMultiSelect, pendingEntry} from "./types"
 import _ from 'lodash'
 import fs from 'fs'
-import {dirname} from 'path'
+import path, {dirname} from 'path'
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function writeFile(path: string, contents: string) {
   fs.mkdirSync(dirname(path), { recursive: true})
@@ -30,6 +34,8 @@ interface Options {
   databaseId: string,
   notionAPIKey: string,
   debug?: boolean,
+  refreshTimeout?: number, // in ms
+  localCacheDirectory?: string
   rootUrl?: string | URL | undefined // Used to generate full path links,
   limiter?: {schedule: Function} 
 }
@@ -41,11 +47,23 @@ export default class NotionCMS {
   parser: NotionBlocksHtmlParser
   pendingEntries: Set<pendingEntry>
   pageRetrievalCache: Record<string, GetPageResponse>
+  refreshTimeout: number
+  defaultCacheFilename: string
+  localCacheDirectory: string
+  localCacheUrl: string
   debug: boolean | undefined
   limiter: {schedule: Function} 
 
-  constructor({databaseId, notionAPIKey, debug, rootUrl, limiter}: Options = {databaseId : '', notionAPIKey: '', debug: false, rootUrl: ''}, previousState: string) {
-    this.cms = previousState && JSON.parse(previousState) || {
+  constructor({
+    databaseId,
+    notionAPIKey,
+    debug,
+    refreshTimeout,
+    localCacheDirectory,
+    rootUrl,
+    limiter
+  }: Options = {databaseId : '', notionAPIKey: '', debug: false, rootUrl: ''}, previousState: string) {
+    this.cms = previousState && this.import(previousState) || {
       metadata: {
         databaseId,
         rootUrl: rootUrl ? new URL(rootUrl) : ''
@@ -64,6 +82,10 @@ export default class NotionCMS {
     this.parser = NotionBlocksHtmlParser.getInstance()
     this.pendingEntries = new Set<pendingEntry>()
     this.pageRetrievalCache = {}
+    this.refreshTimeout = refreshTimeout || 0
+    this.localCacheDirectory = localCacheDirectory || './.notion-cms/'
+    this.defaultCacheFilename = `cache.json`
+    this.localCacheUrl = path.resolve(__dirname, this.localCacheDirectory + this.defaultCacheFilename)
     this.debug = debug
     this.limiter = limiter || {schedule: (func: Function) => {const result = func(); return Promise.resolve(result)}}
 
@@ -318,7 +340,7 @@ export default class NotionCMS {
     )
     for await (const entry of db.results as PageObjectResponse[]) {
       // Fetch page: parent-page relationship here and store in transient object.
-      let transient = stateWithDb.transient[entry.id] = {name: '', parentPage: '', authorIds: undefined}
+      let transient = stateWithDb.transient[entry.id] = {name: '', parentPage: ''}
       const parentPage = entry.properties['parent-page'] as PageObjectRelation
       if (parentPage) transient['parentPage'] = parentPage.relation[0]?.id
     }
@@ -327,22 +349,35 @@ export default class NotionCMS {
   }
 
   async fetch(): Promise<CMS> {
-    // For now clear the cache anytime we re-run the fetch. In the future we want to make the cache clearing dynamically based on 
-    // an AgencyKit API flag.
-    this._clearPageRetrievalCache()
-
-    if (!_.includes(this.cms.stages, 'db')) {
+    let cachedCMS
+    if (fs.existsSync(this.localCacheUrl)) {
+      cachedCMS = this.import(fs.readFileSync(this.localCacheUrl, 'utf-8'))
+    }
+    // Use refresh time to see if we should return local env cache or fresh api calls from Notion
+    if (cachedCMS && cachedCMS.lastUpdateTimestamp &&
+        Date.now() < (cachedCMS.lastUpdateTimestamp + this.refreshTimeout)) {
+        if(this.debug) console.log('using cache')
+        this.cms = cachedCMS
+    } else {
+      if(this.debug) console.log('using API')
+      // For now clear the cache anytime we re-run the fetch. In the future we want to make the cache clearing dynamically based on 
+      // an AgencyKit API flag.
+      this._clearPageRetrievalCache()
+      if (!_.includes(this.cms.stages, 'db')) {
         this.cms = await this._getDb(this.cms)
-    }
-    if (!_.includes(this.cms.stages, 'pages')) {
+      }
+      if (!_.includes(this.cms.stages, 'pages')) {
         this.cms = await this._getPages(this.cms)
-    }
-    if (!_.includes(this.cms.stages, 'content')) {
+      }
+      if (!_.includes(this.cms.stages, 'content')) {
         this.cms = await this._getPageContent(this.cms)
+        this.cms.stages.push('complete')
+        delete this.cms['transient']
+      }
+      if (this.cms.stages, 'complete') {
+        writeFile(this.localCacheUrl, this.export())
+      }
     }
-       
-    delete this.cms['transient']
-
     void this.routes
     if (this.debug) writeFile('debug/site-data.json', JSON.stringify(this.cms))
     return this.cms
@@ -364,6 +399,11 @@ export default class NotionCMS {
   }
 
   export() {
+    this.cms.lastUpdateTimestamp = Date.now()
     return JSON.stringify(this.cms)
+  }
+
+  import(previousState: string): CMS {
+    return JSON.parse(previousState)
   }
 }

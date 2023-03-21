@@ -14,6 +14,7 @@ export interface PageEntry {
 
 export interface CMS {
   stages: Array<string>,
+  lastUpdateTimestamp?: number,
   metadata: {
     rootUrl?: string | URL | undefined,
     databaseId: string

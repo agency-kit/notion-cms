@@ -3,6 +3,7 @@ import NotionCMS from '../dist/index.mjs'
 import dotenv from 'dotenv'
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';
+import { removeContent } from "./test-utils.mjs";
 
 import { expectedRoutes, expectedSiteData, expectedTaggedCollection } from './notion-api-mock.spec.mjs';
 
@@ -28,16 +29,6 @@ const testCMS = new NotionCMS({
 
 await testCMS.fetch()
 
-function removeContent(obj) {
-  for (const prop in obj) {
-    if (prop === 'content')
-      // delete obj[prop];
-      obj[prop] = ''
-    else if (typeof obj[prop] === 'object')
-      removeContent(obj[prop]);
-  }
-}
-
 test('routes', () => {
   assert.equal(testCMS.routes.sort(), expectedRoutes.sort())
 })
@@ -45,13 +36,13 @@ test('routes', () => {
 test('siteData', () => {
   // Ignore content for now
   const filtered = structuredClone(testCMS.cms.siteData)
-  removeContent(filtered)
+  removeContent(filtered, 'content')
   assert.equal(filtered, expectedSiteData)
 })
 
 test('taggedCollection', () => {
   const results = testCMS.getTaggedCollection(['notion', 'javascript'])
-  results.forEach(result => removeContent(result))
+  results.forEach(result => removeContent(result, 'content'))
   assert.equal(results, expectedTaggedCollection)
 })
 

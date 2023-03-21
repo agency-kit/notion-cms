@@ -1,9 +1,9 @@
-export function removeContent(obj) {
+export function removeContent(obj, removalProperty) {
   for (const prop in obj) {
-    if (prop === 'content')
+    if (prop === removalProperty)
       // delete obj[prop];
       obj[prop] = ''
     else if (typeof obj[prop] === 'object')
-      removeContent(obj[prop]);
+      removeContent(obj[prop], removalProperty);
   }
 }
