@@ -2,7 +2,7 @@ import NotionCMS from '../dist/index.mjs'
 import dotenv from 'dotenv'
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';
-import {removeContent} from './test-utils.mjs'
+import { removeContent } from './test-utils.mjs'
 
 import { expectedRoutes, expectedSiteData, expectedTaggedCollection } from './notion-api-mock.spec.mjs';
 
@@ -29,13 +29,13 @@ test('routes', () => {
 test('siteData', () => {
   // Ignore content for now
   const filtered = structuredClone(testCMS.cms.siteData)
-  removeContent(filtered)
+  removeContent(filtered, 'content')
   assert.equal(filtered, expectedSiteData)
 })
 
 test('taggedCollection', () => {
   const results = testCMS.getTaggedCollection(['notion', 'javascript'])
-  results.forEach(result => removeContent(result))
+  results.forEach(result => removeContent(result, 'content'))
   assert.equal(results, expectedTaggedCollection)
 })
 
