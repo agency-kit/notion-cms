@@ -1,11 +1,20 @@
 import { Client, isFullPage } from "@notionhq/client"
-import {PageObjectResponse, GetPageResponse} from '@notionhq/client/build/src/api-endpoints'
+import { PageObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import { NotionBlocksHtmlParser } from '@notion-stuff/blocks-html-parser'
-import {Blocks} from '@notion-stuff/v4-types'
-import type { Cover, CMS, Page, PageContent, RouteObject, Transient, PageObjectTitle, PageObjectRelation, PageObjectUser, PageMultiSelect, pendingEntry} from "./types"
+import { Blocks } from '@notion-stuff/v4-types'
+import type { 
+  Cover, 
+  CMS,
+  Page,
+  RouteObject,
+  PageObjectTitle,
+  PageObjectRelation,
+  PageObjectUser,
+  PageMultiSelect
+} from "./types"
 import _ from 'lodash'
 import fs from 'fs'
-import path, {dirname} from 'path'
+import path, { dirname } from 'path'
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,8 +54,6 @@ export default class NotionCMS {
   cmsId: string
   notionClient: Client
   parser: NotionBlocksHtmlParser
-  pendingEntries: Set<pendingEntry>
-  pageRetrievalCache: Record<string, GetPageResponse>
   refreshTimeout: number
   defaultCacheFilename: string
   localCacheDirectory: string
@@ -72,7 +79,6 @@ export default class NotionCMS {
       routes: [],
       tags: [],
       tagGroups: {},
-      transient: {},
       siteData: {}
     }
     this.cmsId = databaseId
@@ -80,8 +86,6 @@ export default class NotionCMS {
       auth: notionAPIKey
     })
     this.parser = NotionBlocksHtmlParser.getInstance()
-    this.pendingEntries = new Set<pendingEntry>()
-    this.pageRetrievalCache = {}
     this.refreshTimeout = refreshTimeout || 0
     this.localCacheDirectory = localCacheDirectory || './.notion-cms/'
     this.defaultCacheFilename = `cache.json`
@@ -130,13 +134,14 @@ export default class NotionCMS {
     return results
   }
 
-  _clearPageRetrievalCache(): void {
-    this.pageRetrievalCache = {}
-  }
-
   _isTopLevelDir(response: PageObjectResponse): boolean {
     const parentPage = response?.properties['parent-page'] as PageObjectRelation 
     return _.isEmpty(parentPage.relation)
+  }
+
+  _getParentPageId(response: PageObjectResponse): string {
+    const parentPage = response?.properties['parent-page'] as PageObjectRelation 
+    return parentPage.relation[0].id
   }
   
   _getBlockName(response: PageObjectResponse): string {
@@ -169,118 +174,25 @@ export default class NotionCMS {
     return value;
   }
 
-  _getCoverImage(page: PageObjectResponse, source: string): URL {
+  _getCoverImage(page: PageObjectResponse): URL {
     const pageCoverProp = (page as PageObjectResponse)?.cover as Cover
     let coverImage;
     if (pageCoverProp && 'external' in pageCoverProp) {
       coverImage = pageCoverProp?.external?.url
     } else if (pageCoverProp?.file){
       coverImage = pageCoverProp?.file.url
-    } else {
-     coverImage = source.match(COVER_IMAGE_REGEX)?.[1]
     }
     return coverImage
   }
 
-  async _pullPageContent(id: string, cms: CMS): Promise<PageContent> {
-    let page
-    const tags = [] as Array<string>
-    page = await this._retrievePage(id)
-  
+  async _pullPageContent(id: string): Promise<string> {
     const pageContent = await this.limiter.schedule(
       async () => await this.notionClient.blocks.children.list({
         block_id: id,
         page_size: 50,
       })
     )
-    const name = this._getBlockName(page as PageObjectResponse).slug
-    const parsed = this.parser.parse(pageContent.results as Blocks)
-
-    // Fall back to the first image in the page if one exists.
-    if (isFullPage(page as PageObjectResponse)) {
-      const coverImage = this._getCoverImage(page as PageObjectResponse, parsed)
-      const extractedTags = this._extractTags(page as PageObjectResponse)
-      extractedTags.forEach(tag => {
-        tags.push(tag)
-        if (!_.includes(cms.tags, tag)) cms.tags.push(tag)
-        this._assignTagGroup(tag, name.route, cms)
-      })
-      return {
-        name,
-        tags,
-        coverImage,
-        content: parsed
-      }
-    } else return {
-      name: '',
-      tags: [],
-      coverImage: new URL(''),
-      content: ''
-    }
-  }
-
-  _findInPending(entry: Transient) {
-    let match
-    this.pendingEntries.forEach(pendingEntry => {
-      if (entry === pendingEntry.entry) {
-        match = pendingEntry
-      }
-    })
-    return match
-  }
-
-  async _retrievePage(id: string): Promise<GetPageResponse> {
-    let parentPage = this.pageRetrievalCache[id]
-    // Check cache before making this call.
-    if (!parentPage) {
-      parentPage = await this.limiter.schedule(
-        async () => await this.notionClient.pages.retrieve({ page_id: id })
-      )
-      this.pageRetrievalCache[id] = parentPage
-    }
-    return parentPage
-  }
-
-  async _addPage(entry: Transient, id:string, siteData: CMS['siteData']): Promise<void> {
-    let page, name, authors, parentPage, parentName, updateObject;
-    const parentId = entry.parentPage
-
-    if (parentId){
-      parentPage = await this._retrievePage(parentId)
-    }
-    page = await this._retrievePage(id)
-    if (page && isFullPage(page)) {
-      name = this._getBlockName(page).slug.route
-      const authorProp = page.properties?.Author as PageObjectUser
-      const authorIds = authorProp['people']
-      authors = authorIds.map(authorId => authorId.name)
-      entry['name'] = name
-      if (parentPage && isFullPage(parentPage)) {
-        parentName = this._getBlockName(parentPage).slug.route
-        updateObject = this._findByKey(siteData, parentName)
-      } else {
-        updateObject = siteData
-      }
-    }
-
-    if (updateObject && name) {
-      if (!updateObject[name]) updateObject[name] = {authors} as Page
-      const match = this._findInPending(entry)
-      if (match) this.pendingEntries.delete(match)
-    } else {
-      let shouldAdd = true
-      for (const pendingEntry of this.pendingEntries) {
-        if (_.isEqual(entry, pendingEntry.entry)) {
-          shouldAdd = false; break;
-        };
-      }
-      if (shouldAdd) {
-        this.pendingEntries.add({
-          id,
-          entry
-        })
-      }
-    }
+    return this.parser.parse(pageContent.results as Blocks)
   }
 
   async _getAuthorData(authorIds: Array<string>): Promise<Array<string>> {
@@ -302,48 +214,123 @@ export default class NotionCMS {
     return []
   }
 
+  async _crawlRoutes(tree: Object, fn: Function): Promise<void> {
+    for (const node of _.entries(tree)) {
+      const [key, value] = node
+      if (_.startsWith(key, '/')) {
+        if (this.debug) console.log(key, 'currently updating')
+        await fn(node)
+        await this._crawlRoutes(value, fn)
+      }
+    }
+  }
+
   async _getPageContent(state: CMS): Promise<CMS> {
     let stateWithContent = _.cloneDeep(state)
-    if (!stateWithContent.transient) return stateWithContent
-    for await (const [idx, entry] of Object.entries(stateWithContent.transient)) {
-      let updateObject = this._findByKey(stateWithContent.siteData, entry.name) as Page
-      const content = await this._pullPageContent(idx, stateWithContent)
-      updateObject.name = content.name
-      updateObject.tags = content.tags
-      updateObject.coverImage = content.coverImage
-      updateObject.content = content.content
-    }
+    // can this async recursion be more performant?
+    await this._crawlRoutes(stateWithContent.siteData, async (node: Array<string | Page>) => {
+      let content
+      const [key, value] = node
+      let updateObject =
+        typeof key === 'string' ?
+        this._findByKey(stateWithContent.siteData, key) as Page :
+        undefined
+      if (typeof value !== 'string' && value._notion) {
+        content = await this._pullPageContent(value._notion.id)
+      }
+      if (content) {
+        if (updateObject && content) updateObject.content = content
+        // In case there was no cover image property, lets fall back to the first image in the html 
+        if (updateObject && updateObject?.coverImage === undefined) {
+          const imageUrl = content.match(COVER_IMAGE_REGEX)?.[1]
+          updateObject.coverImage = imageUrl ? new URL(imageUrl) : undefined
+        }
+      }
+    })
+
     stateWithContent.stages.push('content')
     return stateWithContent
   }
 
-  async _getPages(state: CMS): Promise<CMS> {
-    let stateWithPages = _.cloneDeep(state)
-    if (!stateWithPages.transient) return stateWithPages
-    for await (const [id, entry] of Object.entries(stateWithPages.transient)) {
-      await this._addPage(entry, id, stateWithPages.siteData)
+  _getPageUpdate(entry: PageObjectResponse, cms: CMS): Array<string | Page> {
+    const name = this._getBlockName(entry)
+    const tags = [] as Array<string>
+    const authorProp = entry.properties?.Author as PageObjectUser
+    const authors = authorProp['people'].map(authorId => authorId.name)
+    if (isFullPage(entry as PageObjectResponse)) {
+      const coverImage = this._getCoverImage(entry as PageObjectResponse)
+      const extractedTags = this._extractTags(entry as PageObjectResponse)
+      extractedTags.forEach(tag => {
+        tags.push(tag)
+        if (!_.includes(cms.tags, tag)) cms.tags.push(tag)
+        this._assignTagGroup(tag, name.slug.route, cms)
+      })
+    const route = name.slug.route
+    return [
+      route,
+      {
+        name,
+        slug: name.slug,
+        authors,
+        tags,
+        coverImage,
+        _notion: {
+          id: entry.id,
+          last_edited_time: entry.last_edited_time,
+        }
+      }]
     }
-    while (this.pendingEntries.size) {
-      for await (const pendingEntry of this.pendingEntries) {
-        await this._addPage(pendingEntry.entry, pendingEntry.id, stateWithPages.siteData)
-      }
-    }
-    stateWithPages.stages.push('pages')
-    return stateWithPages
+    return []
   }
 
   async _getDb(state: CMS): Promise<CMS> {
     let stateWithDb = _.cloneDeep(state)
-    if (!stateWithDb.transient) return stateWithDb
+    let entryPool = {} as {[x: string] : Object}
     const db = await this.limiter.schedule(
       async () => await this.notionClient.databases.query({database_id: state.metadata.databaseId})
     )
-    for await (const entry of db.results as PageObjectResponse[]) {
-      // Fetch page: parent-page relationship here and store in transient object.
-      let transient = stateWithDb.transient[entry.id] = {name: '', parentPage: ''}
-      const parentPage = entry.properties['parent-page'] as PageObjectRelation
-      if (parentPage) transient['parentPage'] = parentPage.relation[0]?.id
-    }
+
+    const tlds: PageObjectResponse[] = _.filter(db.results, this._isTopLevelDir)
+    let subPages: PageObjectResponse[] = _.reject(db.results, this._isTopLevelDir)
+
+    tlds.forEach(directory => {
+      const [route, update] = this._getPageUpdate(directory, stateWithDb)
+      if (typeof route === 'string') stateWithDb.siteData[route] = update as Page
+    })
+
+    do {
+      for (const subPage of subPages) {
+        let remove = false
+        const [route, update] = this._getPageUpdate(subPage as PageObjectResponse, stateWithDb)
+        const parentId = this._getParentPageId(subPage)
+        const parent = _.find(db.results, result => result.id === parentId)
+        const parentRoute = this._getBlockName(parent).slug.route
+        const updateObject = this._findByKey(stateWithDb.siteData, parentRoute)
+        if (typeof route === 'string') {
+          if (updateObject) {
+              updateObject[route] = update as Page
+              remove = true
+          } else {
+            entryPool[route] = update
+            for (const storedEntry of _.entries(entryPool)) {
+              const [key, value] = storedEntry
+              if (key === parentRoute) {
+                _.assign(value, update)
+                remove = true
+              } else {
+                const updateObject = this._findByKey(value as Record<string, Page>, parentRoute)
+                if (updateObject) {
+                  updateObject[route] = update as Page
+                  remove = true
+                }
+              }
+            }
+          }
+        }
+        if (remove) subPages = _.pull(subPages, subPage)
+      }
+    } while (subPages.length)
+
     stateWithDb.stages.push('db')
     return stateWithDb
   }
@@ -362,19 +349,14 @@ export default class NotionCMS {
       if(this.debug) console.log('using API')
       // For now clear the cache anytime we re-run the fetch. In the future we want to make the cache clearing dynamically based on 
       // an AgencyKit API flag.
-      this._clearPageRetrievalCache()
       if (!_.includes(this.cms.stages, 'db')) {
         this.cms = await this._getDb(this.cms)
-      }
-      if (!_.includes(this.cms.stages, 'pages')) {
-        this.cms = await this._getPages(this.cms)
       }
       if (!_.includes(this.cms.stages, 'content')) {
         this.cms = await this._getPageContent(this.cms)
         this.cms.stages.push('complete')
-        delete this.cms['transient']
       }
-      if (this.cms.stages, 'complete') {
+      if (_.includes(this.cms.stages, 'complete')) {
         writeFile(this.localCacheUrl, this.export())
       }
     }
