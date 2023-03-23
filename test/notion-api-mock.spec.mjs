@@ -28,77 +28,127 @@ export const expectedRoutes = [
 
 export const expectedSiteData = {
   '/about': {
-    name: 'about',
+    name: 'About',
     authors: ['Jacob'],
     tags: [],
-    content: '',
-    coverImage: undefined
-  },
-  '/team': {
-    name: 'team',
-    authors: [],
-    tags: [],
+    _notion: {
+      id: "232177b4-31ac-4fdb-946b-cdd996add2d2",
+      last_edited_time: "2023-03-12T20:54:00.000Z"
+    },
     content: '',
     coverImage: undefined,
+    slug: 'about'
+  },
+  '/team': {
+    name: 'Team',
+    authors: [],
+    tags: [],
+    _notion: {
+      id: "b59e1887-7c2c-4566-afc9-a619271ad56d",
+      last_edited_time: "2023-03-12T20:53:00.000Z"
+    },
+    content: '',
+    coverImage: undefined,
+    slug: 'team',
     '/mortimer': {
-      name: 'mortimer',
+      name: 'Mortimer',
       authors: [],
       tags: [],
+      _notion: {
+        id: "d400849b-afc2-4ffe-8150-83005a624192",
+        last_edited_time: "2023-03-12T20:46:00.000Z"
+      },
       content: '',
-      coverImage: undefined
+      coverImage: undefined,
+      slug: 'mortimer'
     },
     '/jacob': {
-      name: 'jacob',
+      name: 'Jacob',
       authors: [],
       tags: [],
       content: '',
-      coverImage: undefined
+      _notion: {
+        id: "0076e375-3bed-4aa1-97c2-2eea4d58fe93",
+        last_edited_time: "2023-03-12T20:45:00.000Z"
+      },
+      coverImage: undefined,
+      slug: 'jacob'
     }
   },
   '/pricing': {
-    name: 'pricing',
+    name: 'Pricing',
     authors: [],
     tags: [],
     content: '',
-    coverImage: undefined
+    _notion: {
+      id: "595bf484-5455-41ab-beea-9d1a9d363464",
+      last_edited_time: "2023-03-12T20:55:00.000Z"
+    },
+    coverImage: undefined,
+    slug: 'pricing'
   },
   '/posts': {
-    name: 'posts',
+    name: 'Posts',
     authors: ['Jacob'],
     tags: [],
+    _notion: {
+      id: "226956e8-075d-4f50-bf7f-2c683fd93032",
+      last_edited_time: "2023-03-12T20:33:00.000Z"
+    },
     content: '',
     coverImage: undefined,
+    slug: 'posts',
     '/how-to-use-notion-cms': {
-      name: 'how-to-use-notion-cms',
+      name: 'How to use Notion CMS',
       authors: [],
       tags: ['blog', 'notion', 'javascript'],
+      _notion: {
+        id: "5d002c2b-bbf5-409a-b26a-9995a059138f",
+        last_edited_time: "2023-03-12T20:34:00.000Z"
+      },
       content: '',
-      coverImage: undefined
+      coverImage: undefined,
+      slug: 'how-to-use-notion-cms'
     },
     '/how-to-build-a-blog-with-notion': {
-      name: 'how-to-build-a-blog-with-notion',
+      name: 'How to build a blog with Notion',
       authors: [],
       tags: ['blog', 'notion'],
+      _notion: {
+        id: "0148a891-e127-48ec-91d2-6213b9167593",
+        last_edited_time: "2023-03-12T20:36:00.000Z"
+      },
       content: '',
-      coverImage: undefined
+      coverImage: undefined,
+      slug: 'how-to-build-a-blog-with-notion'
     }
   }
 }
 
 export const expectedTaggedCollection = [
   {
-    name: 'how-to-build-a-blog-with-notion',
+    name: 'How to build a blog with Notion',
     authors: [],
     tags: ['blog', 'notion'],
     coverImage: undefined,
-    content: ''
+    _notion: {
+      id: "0148a891-e127-48ec-91d2-6213b9167593",
+      last_edited_time: "2023-03-12T20:36:00.000Z"
+    },
+    content: '',
+    slug: 'how-to-build-a-blog-with-notion'
   },
   {
-    name: 'how-to-use-notion-cms',
+    name: 'How to use Notion CMS',
     authors: [],
     tags: ['blog', 'notion', 'javascript'],
     coverImage: undefined,
-    content: ''
+    _notion: {
+      id: "5d002c2b-bbf5-409a-b26a-9995a059138f",
+      last_edited_time: "2023-03-12T20:34:00.000Z"
+    },
+    content: '',
+    slug: 'how-to-use-notion-cms'
   },
 ]
 

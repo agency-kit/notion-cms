@@ -7,11 +7,6 @@ declare global {
   }
 }
 
-export interface PageEntry {
-  parentName: string,
-  entry: PageObjectResponse
-}
-
 export interface CMS {
   stages: Array<string>,
   lastUpdateTimestamp?: number,
@@ -22,26 +17,19 @@ export interface CMS {
   routes: Array<string | Array>,
   tags: Array<string>,
   tagGroups: Record<string, Array<string>>
-  transient?: Record<string, Transient>
   siteData: Record<string, Page>
 }
 
-export type Transient = {
-  name: string,
-  parentPage: string | undefined,
-}
-
-export interface pendingEntry {
-  id: string,
-  entry: Transient
-}
-
 export type PageContent = {
-  name: string,
+  name?: string,
+  _notion?: {
+    id: string,
+    last_edited_time: string,
+  }
   authors?: Array<string>,
-  tags: Array<string>,
-  coverImage: URL,
-  content: string,
+  tags?: Array<string>,
+  coverImage?: URL,
+  content?: string,
 }
 
 export type Route = {
