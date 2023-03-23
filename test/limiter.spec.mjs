@@ -23,6 +23,7 @@ const limiter = new Bottleneck({
 const testCMS = new NotionCMS({
   databaseId: 'e4fcd5b3-1d6a-4afd-b951-10d56ce436ad',
   notionAPIKey: process.env.NOTION,
+  draftMode: true,
   debug: true,
   limiter
 })

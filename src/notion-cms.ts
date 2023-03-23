@@ -1,5 +1,5 @@
 import { Client, isFullPage } from "@notionhq/client"
-import { PageObjectResponse } from '@notionhq/client/build/src/api-endpoints'
+import { PageObjectResponse, SelectPropertyItemObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import { NotionBlocksHtmlParser } from '@notion-stuff/blocks-html-parser'
 import { Blocks } from '@notion-stuff/v4-types'
 import type { 
@@ -43,6 +43,7 @@ interface Options {
   databaseId: string,
   notionAPIKey: string,
   debug?: boolean,
+  draftMode?: boolean,
   refreshTimeout?: number, // in ms
   localCacheDirectory?: string
   rootUrl?: string | URL | undefined // Used to generate full path links,
@@ -55,6 +56,7 @@ export default class NotionCMS {
   notionClient: Client
   parser: NotionBlocksHtmlParser
   refreshTimeout: number
+  draftMode: boolean
   defaultCacheFilename: string
   localCacheDirectory: string
   localCacheUrl: string
@@ -65,11 +67,12 @@ export default class NotionCMS {
     databaseId,
     notionAPIKey,
     debug,
+    draftMode,
     refreshTimeout,
     localCacheDirectory,
     rootUrl,
     limiter
-  }: Options = {databaseId : '', notionAPIKey: '', debug: false, rootUrl: ''}, previousState: string) {
+  }: Options = {databaseId : '', notionAPIKey: '', debug: false, rootUrl: '', draftMode: false}, previousState: string) {
     this.cms = previousState && this.import(previousState) || {
       metadata: {
         databaseId,
@@ -87,6 +90,7 @@ export default class NotionCMS {
     })
     this.parser = NotionBlocksHtmlParser.getInstance()
     this.refreshTimeout = refreshTimeout || 0
+    this.draftMode = draftMode || false
     this.localCacheDirectory = localCacheDirectory || './.notion-cms/'
     this.defaultCacheFilename = `cache.json`
     this.localCacheUrl = path.resolve(__dirname, this.localCacheDirectory + this.defaultCacheFilename)
@@ -289,9 +293,13 @@ export default class NotionCMS {
     const db = await this.limiter.schedule(
       async () => await this.notionClient.databases.query({database_id: state.metadata.databaseId})
     )
+    const publishedFilter = (e: PageObjectResponse) => {
+      const publishProp = e.properties['Published'] as SelectPropertyItemObjectResponse
+      return this.draftMode ? true : publishProp.select && publishProp.select.name === 'Published'
+    }
 
-    const tlds: PageObjectResponse[] = _.filter(db.results, this._isTopLevelDir)
-    let subPages: PageObjectResponse[] = _.reject(db.results, this._isTopLevelDir)
+    const tlds: PageObjectResponse[] = _(db.results).filter(this._isTopLevelDir).filter(publishedFilter)
+    let subPages: PageObjectResponse[] = _.reject(db.results, this._isTopLevelDir).filter(publishedFilter)
 
     tlds.forEach(directory => {
       const [route, update] = this._getPageUpdate(directory, stateWithDb)
