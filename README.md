@@ -67,4 +67,8 @@ console.log(myCoolCMS.data)
 // Get tagged collections this way or by passing a single tag:
 const tagged = myCoolCMS.getTaggedCollection(['blog', 'programming'])
 
+// Access paths like this:
+const postA = myCoolCMS.data['/posts']['/how-to-build-a-blog-with-notion']
+const postB = myCoolCMS.data['/posts']['/how-to-use-notion-cms']
+
 ```
