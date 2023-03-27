@@ -28,23 +28,15 @@ See the structure in this template https://cooked-shovel-3c3.notion.site/Communi
 - [x] route generation for SSG
 - [x] content caching
 - [x] tag grouping and filtering
+- [x] plugin system
 - [ ] optimized content caching
 - [ ] Aliasable component mapping (using notion callouts)
 - [ ] arbitrary notion properties handling
 - [ ] Layout definitions and ability to add custom layouts
 - [ ] custom paths
 - [ ] style linking/parsing from notion db
-- [ ] automatic image optimization (unsplash images are massive by default)
-- [ ] plugin system for custom transformations?
-- [ ] NetlifyForms (substrat) renderer - Vue only but possibly support any renderer in the future.
 
- ## Todos
-- [ ] proper logging/debugging
-- [ ] config, cli
-- [ ] subset fetching?
-
-
-## Usage
+## Basic Usage
 
 ```javascript
 
@@ -56,7 +48,7 @@ const myCoolCMS = new NotionCMS({
 })
 
 // Pull down all Notion content
-myCoolCMS.fetch()
+await myCoolCMS.fetch()
 
 // Access the routes here:
 console.log(myCoolCMS.routes)
@@ -70,5 +62,52 @@ const tagged = myCoolCMS.getTaggedCollection(['blog', 'programming'])
 // Access paths like this:
 const postA = myCoolCMS.data['/posts']['/how-to-build-a-blog-with-notion']
 const postB = myCoolCMS.data['/posts']['/how-to-use-notion-cms']
+
+```
+
+## Advanced Usage
+
+```javascript
+
+const customPlugin = () => {
+  return {
+    name: 'my-custom-plugin',
+    hook: 'pre-parse', // other option is 'post-parse'
+    // list of blocks to transform.
+    // If hook is post parse, its the string of html parsed from blocks
+    exec: (blocksOrHtml) => {
+      // do some transformations,
+      const transformedBlocksOrHtml = someXform(blocksOrHtml)
+      return transformedBlocksOrHtml
+    }
+  }
+}
+
+const myAdvancedCMS = new NotionCMS({
+  databaseId: 'e4fcd5b3-1d6a-4afd-b951-10d56ce436ad',
+  notionAPIKey: process.env.NOTION,
+  rootUrl: 'https://mycoolsite.com',
+  localCacheDirectory: './localcache/',
+  refreshTimeout: 1000 * 60 * 60,
+  plugins: [customPlugin()],
+})
+
+await myAdvancedCMS.fetch()
+
+```
+
+See actual plugins for more in depth examples.
+
+## Some Helper methods
+
+```javascript
+
+myCMS.filterSubPages('/path-segment' /* or Page reference*/)
+
+// returns an array of only child pages of a page looked up using the key.
+
+myCMS.queryByPath('/full/path/to/page')
+
+// returns page reference
 
 ```

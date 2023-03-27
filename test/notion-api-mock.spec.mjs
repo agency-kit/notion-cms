@@ -29,6 +29,8 @@ export const expectedRoutes = [
 export const expectedSiteData = {
   '/about': {
     name: 'About',
+    metaTitle: "About NotionCMS",
+    metaDescription: "Notion CMS is pretty neat.",
     authors: ['Jacob'],
     tags: [],
     _notion: {
@@ -37,7 +39,9 @@ export const expectedSiteData = {
     },
     content: '',
     coverImage: undefined,
-    slug: 'about'
+    slug: 'about',
+    path: "/about",
+    url: ""
   },
   '/team': {
     name: 'Team',
@@ -50,6 +54,8 @@ export const expectedSiteData = {
     content: '',
     coverImage: undefined,
     slug: 'team',
+    path: "/team",
+    url: "",
     '/mortimer': {
       name: 'Mortimer',
       authors: [],
@@ -60,7 +66,11 @@ export const expectedSiteData = {
       },
       content: '',
       coverImage: undefined,
-      slug: 'mortimer'
+      slug: 'mortimer',
+      path: "/team/mortimer",
+      url: "",
+      metaTitle: undefined,
+      metaDescription: undefined
     },
     '/jacob': {
       name: 'Jacob',
@@ -72,8 +82,14 @@ export const expectedSiteData = {
         last_edited_time: "2023-03-12T20:45:00.000Z"
       },
       coverImage: undefined,
-      slug: 'jacob'
-    }
+      slug: 'jacob',
+      path: "/team/jacob",
+      url: "",
+      metaTitle: undefined,
+      metaDescription: undefined
+    },
+    metaTitle: undefined,
+    metaDescription: undefined
   },
   '/pricing': {
     name: 'Pricing',
@@ -85,7 +101,11 @@ export const expectedSiteData = {
       last_edited_time: "2023-03-12T20:55:00.000Z"
     },
     coverImage: undefined,
-    slug: 'pricing'
+    slug: 'pricing',
+    path: "/pricing",
+    url: "",
+    metaTitle: undefined,
+    metaDescription: undefined
   },
   '/posts': {
     name: 'Posts',
@@ -98,6 +118,8 @@ export const expectedSiteData = {
     content: '',
     coverImage: undefined,
     slug: 'posts',
+    path: "/posts",
+    url: "",
     '/how-to-use-notion-cms': {
       name: 'How to use Notion CMS',
       authors: [],
@@ -108,7 +130,11 @@ export const expectedSiteData = {
       },
       content: '',
       coverImage: undefined,
-      slug: 'how-to-use-notion-cms'
+      slug: 'how-to-use-notion-cms',
+      path: "/posts/how-to-use-notion-cms",
+      url: "",
+      metaTitle: undefined,
+      metaDescription: undefined
     },
     '/how-to-build-a-blog-with-notion': {
       name: 'How to build a blog with Notion',
@@ -120,8 +146,14 @@ export const expectedSiteData = {
       },
       content: '',
       coverImage: undefined,
-      slug: 'how-to-build-a-blog-with-notion'
-    }
+      slug: 'how-to-build-a-blog-with-notion',
+      path: "/posts/how-to-build-a-blog-with-notion",
+      url: "",
+      metaTitle: undefined,
+      metaDescription: undefined
+    },
+    metaTitle: undefined,
+    metaDescription: undefined
   }
 }
 
@@ -136,7 +168,11 @@ export const expectedTaggedCollection = [
       last_edited_time: "2023-03-12T20:36:00.000Z"
     },
     content: '',
-    slug: 'how-to-build-a-blog-with-notion'
+    slug: 'how-to-build-a-blog-with-notion',
+    path: "/posts/how-to-build-a-blog-with-notion",
+    url: "",
+    metaTitle: undefined,
+    metaDescription: undefined
   },
   {
     name: 'How to use Notion CMS',
@@ -148,7 +184,11 @@ export const expectedTaggedCollection = [
       last_edited_time: "2023-03-12T20:34:00.000Z"
     },
     content: '',
-    slug: 'how-to-use-notion-cms'
+    slug: 'how-to-use-notion-cms',
+    path: "/posts/how-to-use-notion-cms",
+    url: "",
+    metaTitle: undefined,
+    metaDescription: undefined
   },
 ]
 
