@@ -22,14 +22,18 @@ export interface CMS {
 
 export type PageContent = {
   name?: string,
+  path?: string,
+  url?: string,
   _notion?: {
     id: string,
     last_edited_time: string,
   }
   authors?: Array<string>,
   tags?: Array<string>,
-  coverImage?: URL,
+  coverImage?: string,
   content?: string,
+  metaTitle?: string,
+  metaDescription?: string
 }
 
 export type Route = {
@@ -59,3 +63,9 @@ export type Cover = { type: "external"; external: { url: TextRequest } } | { typ
 
 export type RouteObject = [string, object]
 
+export interface Plugin {
+  name: string,
+  core: boolean,
+  hook: 'pre-parse' | 'post-parse'
+  exec: Function
+}

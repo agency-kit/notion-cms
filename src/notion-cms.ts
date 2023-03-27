@@ -10,12 +10,14 @@ import type {
   PageObjectTitle,
   PageObjectRelation,
   PageObjectUser,
-  PageMultiSelect
+  PageMultiSelect,
+  Plugin
 } from "./types"
 import _ from 'lodash'
 import fs from 'fs'
 import path, { dirname } from 'path'
 import { fileURLToPath } from 'url';
+import { WalkBuilder } from 'walkjs'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,7 +49,8 @@ interface Options {
   refreshTimeout?: number, // in ms
   localCacheDirectory?: string
   rootUrl?: string | URL | undefined // Used to generate full path links,
-  limiter?: {schedule: Function} 
+  limiter?: {schedule: Function},
+  plugins?: Array<Plugin>
 }
 
 export default class NotionCMS {
@@ -61,7 +64,8 @@ export default class NotionCMS {
   localCacheDirectory: string
   localCacheUrl: string
   debug: boolean | undefined
-  limiter: {schedule: Function} 
+  limiter: {schedule: Function}
+  plugins: Array<Plugin> | undefined
 
   constructor({
     databaseId,
@@ -71,12 +75,13 @@ export default class NotionCMS {
     refreshTimeout,
     localCacheDirectory,
     rootUrl,
-    limiter
+    limiter,
+    plugins
   }: Options = {databaseId : '', notionAPIKey: '', debug: false, rootUrl: '', draftMode: false}, previousState: string) {
     this.cms = previousState && this.import(previousState) || {
       metadata: {
         databaseId,
-        rootUrl: rootUrl ? new URL(rootUrl) : ''
+        rootUrl: rootUrl || ''
       },
       stages: [],
       routes: [],
@@ -96,7 +101,7 @@ export default class NotionCMS {
     this.localCacheUrl = path.resolve(__dirname, this.localCacheDirectory + this.defaultCacheFilename)
     this.debug = debug
     this.limiter = limiter || {schedule: (func: Function) => {const result = func(); return Promise.resolve(result)}}
-
+    this.plugins = plugins
     this.limiter.schedule.bind(limiter)
   }
 
@@ -119,6 +124,19 @@ export default class NotionCMS {
   get toplevelDirectories() {
     if (_.isEmpty(this.cms.siteData)) return
     return Object.entries(this.cms.siteData)
+  }
+
+  async _runPlugins(context: Blocks, hook: 'pre-parse' | 'post-parse') {
+    if (!this.plugins?.length) return
+    let val = context
+    for (const plugin of this.plugins) {
+      if (plugin.hook === hook ||
+         (hook === 'pre-parse' && !plugin.hook)) {
+        // pass in previous plugin output
+        val = await plugin.exec(val)
+      }
+    }
+    return val
   }
 
   _genRoutes(directory: RouteObject): Array<string> {
@@ -178,7 +196,7 @@ export default class NotionCMS {
     return value;
   }
 
-  _getCoverImage(page: PageObjectResponse): URL {
+  _getCoverImage(page: PageObjectResponse): string {
     const pageCoverProp = (page as PageObjectResponse)?.cover as Cover
     let coverImage;
     if (pageCoverProp && 'external' in pageCoverProp) {
@@ -196,7 +214,13 @@ export default class NotionCMS {
         page_size: 50,
       })
     )
-    return this.parser.parse(pageContent.results as Blocks)
+    // Currently just mutates the results before passing them to parser. TODO: do better
+    await this._runPlugins(pageContent.results, 'pre-parse')
+    // Pre parse plugin hooks
+    const parsedBlocks = this.parser.parse(pageContent.results as Blocks)
+    // post parse plugin hooks
+    await this._runPlugins(parsedBlocks, 'post-parse')
+    return parsedBlocks
   }
 
   async _getAuthorData(authorIds: Array<string>): Promise<Array<string>> {
@@ -242,12 +266,18 @@ export default class NotionCMS {
       if (typeof value !== 'string' && value._notion) {
         content = await this._pullPageContent(value._notion.id)
       }
-      if (content) {
-        if (updateObject && content) updateObject.content = content
-        // In case there was no cover image property, lets fall back to the first image in the html 
-        if (updateObject && updateObject?.coverImage === undefined) {
-          const imageUrl = content.match(COVER_IMAGE_REGEX)?.[1]
-          updateObject.coverImage = imageUrl ? new URL(imageUrl) : undefined
+      if (updateObject) {
+        const path = this._getFullPath(key as string)
+        updateObject.path = path
+        updateObject.url = this.cms.metadata.rootUrl && path ? this.cms.metadata.rootUrl + path : ''
+        if (content) {
+          updateObject.content = content
+          // Add path to content - can't do it before because siteData doesn't exist.
+          // In case there was no cover image property, lets fall back to the first image in the html 
+          if (updateObject?.coverImage === undefined) {
+            const imageUrl = content.match(COVER_IMAGE_REGEX)?.[1]
+            updateObject.coverImage = imageUrl || undefined
+          }
         }
       }
     })
@@ -256,12 +286,27 @@ export default class NotionCMS {
     return stateWithContent
   }
 
+  _getFullPath(key: string) {
+    let path
+    const matchNode = this._findByKey(this.cms.siteData, key)
+    new WalkBuilder()
+      .withGlobalFilter(node => node?.key?.startsWith && node?.key?.startsWith('/'))
+      .withSimpleCallback(node => {
+        if (node.val == matchNode) path = node.getPath(node=> `${node.key}`)
+      })
+      .walk(this.cms.siteData)
+    return path
+  }
+
   _getPageUpdate(entry: PageObjectResponse, cms: CMS): Array<string | Page> {
-    const name = this._getBlockName(entry)
     const tags = [] as Array<string>
-    const authorProp = entry.properties?.Author as PageObjectUser
-    const authors = authorProp['people'].map(authorId => authorId.name)
     if (isFullPage(entry as PageObjectResponse)) {
+      const name = this._getBlockName(entry)
+      const route = name.slug.route
+      const authorProp = entry.properties?.Author as PageObjectUser
+      const authors = authorProp['people'].map(authorId => authorId.name)
+      const metaTitle = entry.properties?.metaTitle?.rich_text[0]?.plain_text
+      const metaDescription = entry.properties?.metaDescription?.rich_text[0]?.plain_text
       const coverImage = this._getCoverImage(entry as PageObjectResponse)
       const extractedTags = this._extractTags(entry as PageObjectResponse)
       extractedTags.forEach(tag => {
@@ -269,21 +314,22 @@ export default class NotionCMS {
         if (!_.includes(cms.tags, tag)) cms.tags.push(tag)
         this._assignTagGroup(tag, name.slug.route, cms)
       })
-    const route = name.slug.route
-    return [
-      route,
-      {
-        name,
-        slug: name.slug,
-        authors,
-        tags,
-        coverImage,
-        _notion: {
-          id: entry.id,
-          last_edited_time: entry.last_edited_time,
-        }
-      }]
-    }
+      return [
+        route,
+        {
+          name,
+          metaTitle,
+          metaDescription,
+          slug: name.slug,
+          authors,
+          tags,
+          coverImage,
+          _notion: {
+            id: entry.id,
+            last_edited_time: entry.last_edited_time,
+          }
+        }]
+      }
     return []
   }
 
@@ -382,10 +428,24 @@ export default class NotionCMS {
     return _(taggedPages).map(page => this._findByKey(this.cms.siteData, page)).uniq().value()
   }
 
-  filterSubPages(page: Page) {
-    return Object.entries(page)
+  filterSubPages(key: string | Page): Array<Page> {
+    let page
+    if (typeof key === 'string') {
+      page = this._findByKey(this.cms.siteData, key)
+    }
+    return Object.entries(page || key)
       .filter(([key]) => key.startsWith('/'))
-      .map(_.constant)
+      .map(e => e[1])
+  }
+
+  queryByPath(path: string): Page {
+    const segments = path.split('/').slice(1)
+    let access: Page = this.cms.siteData
+    for (const segment of segments) {
+      //@ts-ignore-next-line
+      access = access['/'+ segment]
+    }
+    return access
   }
 
   export() {
