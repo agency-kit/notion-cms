@@ -4,3 +4,4 @@ src/
 .env
 tsconfig.json
 rollup.config.js
+dist/.notion-cms
