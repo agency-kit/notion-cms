@@ -66,6 +66,6 @@ export type RouteObject = [string, object]
 export interface Plugin {
   name: string,
   core: boolean,
-  hook: 'pre-parse' | 'post-parse'
-  exec: Function
+  hook: 'pre-tree' | 'pre-parse' | 'post-parse' | 'post-tree'
+  exec: (context: Blocks | string | CMS) => Blocks | string | CMS
 }
