@@ -12,7 +12,8 @@
     "watch": "NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 chokidar \"src/**/*.ts\" -c \"rollup -c && npx uvu test\"",
     "test:no-mock": "node test/notion-cms.spec.js true",
     "build": "rollup -c",
-    "test": "npx uvu test"
+    "test": "npx uvu test",
+    "build:test": "npm run build && npm run test"
   },
   "repository": {
     "type": "git",

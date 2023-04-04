@@ -126,12 +126,12 @@ export default class NotionCMS {
     return Object.entries(this.cms.siteData)
   }
 
-  async _runPlugins(context: Blocks, hook: 'pre-parse' | 'post-parse') {
-    if (!this.plugins?.length) return
+  async _runPlugins(context: Blocks | CMS, hook: 'pre-tree' | 'pre-parse' | 'post-parse' | 'post-tree')
+    : Promise<Blocks | string | CMS> {
+    if (!this.plugins?.length) return context
     let val = context
     for (const plugin of this.plugins) {
-      if (plugin.hook === hook ||
-         (hook === 'pre-parse' && !plugin.hook)) {
+      if (plugin.hook === hook) {
         // pass in previous plugin output
         val = await plugin.exec(val)
       }
@@ -214,13 +214,11 @@ export default class NotionCMS {
         page_size: 50,
       })
     )
-    // Currently just mutates the results before passing them to parser. TODO: do better
-    await this._runPlugins(pageContent.results, 'pre-parse')
-    // Pre parse plugin hooks
-    const parsedBlocks = this.parser.parse(pageContent.results as Blocks)
-    // post parse plugin hooks
-    await this._runPlugins(parsedBlocks, 'post-parse')
-    return parsedBlocks
+
+    const results = await this._runPlugins(pageContent.results, 'pre-parse')
+    const parsedBlocks = this.parser.parse(results as Blocks)
+    const html = await this._runPlugins(parsedBlocks, 'post-parse') as string
+    return html
   }
 
   async _getAuthorData(authorIds: Array<string>): Promise<Array<string>> {
@@ -283,6 +281,7 @@ export default class NotionCMS {
     })
 
     stateWithContent.stages.push('content')
+    stateWithContent = await this._runPlugins(stateWithContent, 'post-tree') as CMS
     return stateWithContent
   }
 
@@ -386,6 +385,7 @@ export default class NotionCMS {
     } while (subPages.length)
 
     stateWithDb.stages.push('db')
+    stateWithDb = await this._runPlugins(stateWithDb, 'pre-tree') as CMS
     return stateWithDb
   }
 
