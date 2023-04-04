@@ -1,8 +1,9 @@
 import {
-  PageObjectResponse,
   RichTextItemResponse,
-  SelectPropertyResponse
+  PersonUserObjectResponse
 } from '@notionhq/client/build/src/api-endpoints'
+
+import { Blocks } from '@notion-stuff/v4-types'
 
 declare global {
   interface String {
@@ -30,7 +31,7 @@ export interface CMS {
     rootUrl?: string | URL | undefined,
     databaseId: string
   },
-  routes: Array<string | Array>,
+  routes: Array<string | Array<string>>,
   tags: Array<string>,
   tagGroups: Record<string, Array<string>>
   siteData: Record<string, Page>
@@ -45,6 +46,7 @@ export type PageContent = {
     last_edited_time: string,
   }
   authors?: Array<string>,
+  slug?: string,
   tags?: Array<string>,
   coverImage?: string,
   content?: string,
@@ -65,13 +67,17 @@ export type PageObjectRelation = { type: "relation"; relation: Array<{ id: strin
 
 export type PageObjectUser = {
   type: "people"
-  people: Array<PartialUserObjectResponse | UserObjectResponse>
+  people: Array<PersonUserObjectResponse>
   id: string
 }
 
 export type PageMultiSelect = {
   type: "multi_select"
-  multi_select: Array<SelectPropertyResponse>
+  multi_select: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>
   id: string
 }
 
@@ -81,7 +87,7 @@ export type PageRichText = {
   id: string;
 }
 
-export type Cover = { type: "external"; external: { url: TextRequest } } | { type: "file"; file: { url: string; expiry_time: string } } | null
+export type Cover = { type: "external"; external: { url: string } } | { type: "file"; file: { url: string; expiry_time: string } } | null
 
 export type RouteObject = [string, object]
 

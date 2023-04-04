@@ -41,7 +41,8 @@ export const expectedSiteData = {
     coverImage: undefined,
     slug: 'about',
     path: "/about",
-    url: ""
+    url: "",
+    otherProps: {}
   },
   '/team': {
     name: 'Team',
@@ -56,6 +57,7 @@ export const expectedSiteData = {
     slug: 'team',
     path: "/team",
     url: "",
+    otherProps: {},
     '/mortimer': {
       name: 'Mortimer',
       authors: [],
@@ -69,6 +71,7 @@ export const expectedSiteData = {
       slug: 'mortimer',
       path: "/team/mortimer",
       url: "",
+      otherProps: {},
       metaTitle: undefined,
       metaDescription: undefined
     },
@@ -85,6 +88,7 @@ export const expectedSiteData = {
       slug: 'jacob',
       path: "/team/jacob",
       url: "",
+      otherProps: {},
       metaTitle: undefined,
       metaDescription: undefined
     },
@@ -104,6 +108,7 @@ export const expectedSiteData = {
     slug: 'pricing',
     path: "/pricing",
     url: "",
+    otherProps: {},
     metaTitle: undefined,
     metaDescription: undefined
   },
@@ -120,6 +125,7 @@ export const expectedSiteData = {
     slug: 'posts',
     path: "/posts",
     url: "",
+    otherProps: {},
     '/how-to-use-notion-cms': {
       name: 'How to use Notion CMS',
       authors: [],
@@ -133,6 +139,7 @@ export const expectedSiteData = {
       slug: 'how-to-use-notion-cms',
       path: "/posts/how-to-use-notion-cms",
       url: "",
+      otherProps: {},
       metaTitle: undefined,
       metaDescription: undefined
     },
@@ -149,6 +156,7 @@ export const expectedSiteData = {
       slug: 'how-to-build-a-blog-with-notion',
       path: "/posts/how-to-build-a-blog-with-notion",
       url: "",
+      otherProps: {},
       metaTitle: undefined,
       metaDescription: undefined
     },
@@ -171,6 +179,7 @@ export const expectedTaggedCollection = [
     slug: 'how-to-build-a-blog-with-notion',
     path: "/posts/how-to-build-a-blog-with-notion",
     url: "",
+    otherProps: {},
     metaTitle: undefined,
     metaDescription: undefined
   },
@@ -187,6 +196,7 @@ export const expectedTaggedCollection = [
     slug: 'how-to-use-notion-cms',
     path: "/posts/how-to-use-notion-cms",
     url: "",
+    otherProps: {},
     metaTitle: undefined,
     metaDescription: undefined
   },
