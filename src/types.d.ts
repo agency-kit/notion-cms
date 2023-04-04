@@ -1,10 +1,26 @@
-import {PageObjectResponse, DatabaseObjectResponse, RichTextItemResponse, SelectPropertyResponse } from '@notionhq/client/build/src/api-endpoints'
+import {
+  PageObjectResponse,
+  RichTextItemResponse,
+  SelectPropertyResponse
+} from '@notionhq/client/build/src/api-endpoints'
 
 declare global {
   interface String {
     route: string,
     slug: string
   }
+}
+
+export interface Options {
+  databaseId: string,
+  notionAPIKey: string,
+  debug?: boolean,
+  draftMode?: boolean,
+  refreshTimeout?: number, // in ms
+  localCacheDirectory?: string
+  rootUrl?: string | URL | undefined // Used to generate full path links,
+  limiter?: { schedule: Function },
+  plugins?: Array<Plugin>
 }
 
 export interface CMS {
@@ -57,6 +73,12 @@ export type PageMultiSelect = {
   type: "multi_select"
   multi_select: Array<SelectPropertyResponse>
   id: string
+}
+
+export type PageRichText = {
+  type: "rich_text";
+  rich_text: Array<RichTextItemResponse>;
+  id: string;
 }
 
 export type Cover = { type: "external"; external: { url: TextRequest } } | { type: "file"; file: { url: string; expiry_time: string } } | null

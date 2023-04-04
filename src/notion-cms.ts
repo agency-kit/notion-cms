@@ -1,9 +1,13 @@
 import { Client, isFullPage } from "@notionhq/client"
-import { PageObjectResponse, SelectPropertyItemObjectResponse } from '@notionhq/client/build/src/api-endpoints'
+import {
+  PageObjectResponse,
+  SelectPropertyItemObjectResponse
+} from '@notionhq/client/build/src/api-endpoints'
 import { NotionBlocksHtmlParser } from '@notion-stuff/blocks-html-parser'
 import { Blocks } from '@notion-stuff/v4-types'
-import type { 
-  Cover, 
+import type {
+  Cover,
+  Options,
   CMS,
   Page,
   RouteObject,
@@ -11,6 +15,7 @@ import type {
   PageObjectRelation,
   PageObjectUser,
   PageMultiSelect,
+  PageRichText,
   Plugin
 } from "./types"
 import _ from 'lodash'
@@ -22,36 +27,24 @@ import { WalkBuilder } from 'walkjs'
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-function writeFile(path: string, contents: string) {
-  fs.mkdirSync(dirname(path), { recursive: true})
+function writeFile(path: string, contents: string): void {
+  fs.mkdirSync(dirname(path), { recursive: true })
   fs.writeFileSync(path, contents);
 }
 
 const COVER_IMAGE_REGEX = /<figure notion-figure>[\s\S]+<img[^>]*src=['|"](https?:\/\/[^'|"]+)(?:['|"])/
 
 Object.defineProperty(String.prototype, "slug", {
-  get: function() {
+  get: function () {
     return _.kebabCase(this)
   }
 })
 
 Object.defineProperty(String.prototype, "route", {
-  get: function(separator = "/") {
+  get: function (separator = "/") {
     return this.padStart(this.length + 1, separator)
   }
 })
-
-interface Options {
-  databaseId: string,
-  notionAPIKey: string,
-  debug?: boolean,
-  draftMode?: boolean,
-  refreshTimeout?: number, // in ms
-  localCacheDirectory?: string
-  rootUrl?: string | URL | undefined // Used to generate full path links,
-  limiter?: {schedule: Function},
-  plugins?: Array<Plugin>
-}
 
 export default class NotionCMS {
   cms: CMS
@@ -64,7 +57,7 @@ export default class NotionCMS {
   localCacheDirectory: string
   localCacheUrl: string
   debug: boolean | undefined
-  limiter: {schedule: Function}
+  limiter: { schedule: Function }
   plugins: Array<Plugin> | undefined
 
   constructor({
@@ -77,7 +70,7 @@ export default class NotionCMS {
     rootUrl,
     limiter,
     plugins
-  }: Options = {databaseId : '', notionAPIKey: '', debug: false, rootUrl: '', draftMode: false}, previousState: string) {
+  }: Options = { databaseId: '', notionAPIKey: '', debug: false, rootUrl: '', draftMode: false }, previousState: string) {
     this.cms = previousState && this.import(previousState) || {
       metadata: {
         databaseId,
@@ -100,7 +93,7 @@ export default class NotionCMS {
     this.defaultCacheFilename = `cache.json`
     this.localCacheUrl = path.resolve(__dirname, this.localCacheDirectory + this.defaultCacheFilename)
     this.debug = debug
-    this.limiter = limiter || {schedule: (func: Function) => {const result = func(); return Promise.resolve(result)}}
+    this.limiter = limiter || { schedule: (func: Function) => { const result = func(); return Promise.resolve(result) } }
     this.plugins = plugins
     this.limiter.schedule.bind(limiter)
   }
@@ -157,17 +150,17 @@ export default class NotionCMS {
   }
 
   _isTopLevelDir(response: PageObjectResponse): boolean {
-    const parentPage = response?.properties['parent-page'] as PageObjectRelation 
+    const parentPage = response?.properties['parent-page'] as PageObjectRelation
     return _.isEmpty(parentPage.relation)
   }
 
   _getParentPageId(response: PageObjectResponse): string {
-    const parentPage = response?.properties['parent-page'] as PageObjectRelation 
+    const parentPage = response?.properties['parent-page'] as PageObjectRelation
     return parentPage.relation[0].id
   }
-  
+
   _getBlockName(response: PageObjectResponse): string {
-    const nameProp = response?.properties.name as PageObjectTitle 
+    const nameProp = response?.properties.name as PageObjectTitle
     return nameProp.title[0]?.plain_text
   }
 
@@ -201,7 +194,7 @@ export default class NotionCMS {
     let coverImage;
     if (pageCoverProp && 'external' in pageCoverProp) {
       coverImage = pageCoverProp?.external?.url
-    } else if (pageCoverProp?.file){
+    } else if (pageCoverProp?.file) {
       coverImage = pageCoverProp?.file.url
     }
     return coverImage
@@ -222,11 +215,11 @@ export default class NotionCMS {
   }
 
   async _getAuthorData(authorIds: Array<string>): Promise<Array<string>> {
-   let authors;
+    let authors;
     if (authorIds?.length) {
       authors = await Promise.all(
         authorIds.map(async (authorId: string) => {
-        return await this.limiter.schedule(
+          return await this.limiter.schedule(
             async () => await this.notionClient.users.retrieve({ user_id: authorId })
           )
         })
@@ -259,8 +252,8 @@ export default class NotionCMS {
       const [key, value] = node
       let updateObject =
         typeof key === 'string' ?
-        this._findByKey(stateWithContent.siteData, key) as Page :
-        undefined
+          this._findByKey(stateWithContent.siteData, key) as Page :
+          undefined
       if (typeof value !== 'string' && value._notion) {
         content = await this._pullPageContent(value._notion.id)
       }
@@ -289,9 +282,9 @@ export default class NotionCMS {
     let path
     const matchNode = this._findByKey(this.cms.siteData, key)
     new WalkBuilder()
-      .withGlobalFilter(node => node?.key?.startsWith && node?.key?.startsWith('/'))
+      .withGlobalFilter(node => typeof node?.key === 'string' && node?.key?.startsWith('/'))
       .withSimpleCallback(node => {
-        if (node.val == matchNode) path = node.getPath(node=> `${node.key}`)
+        if (node.val == matchNode) path = node.getPath(node => `${node.key}`)
       })
       .walk(this.cms.siteData)
     return path
@@ -302,10 +295,16 @@ export default class NotionCMS {
     if (isFullPage(entry as PageObjectResponse)) {
       const name = this._getBlockName(entry)
       const route = name.slug.route
+
       const authorProp = entry.properties?.Author as PageObjectUser
       const authors = authorProp['people'].map(authorId => authorId.name)
-      const metaTitle = entry.properties?.metaTitle?.rich_text[0]?.plain_text
-      const metaDescription = entry.properties?.metaDescription?.rich_text[0]?.plain_text
+
+      const metaTitleProp = entry.properties?.metaTitle as PageRichText
+      const metaTitle = metaTitleProp?.rich_text[0]?.plain_text
+
+      const metaDescriptionProp = entry.properties?.metaDescription as PageRichText
+      const metaDescription = metaDescriptionProp?.rich_text[0]?.plain_text
+
       const coverImage = this._getCoverImage(entry as PageObjectResponse)
       const extractedTags = this._extractTags(entry as PageObjectResponse)
       extractedTags.forEach(tag => {
@@ -328,22 +327,22 @@ export default class NotionCMS {
             last_edited_time: entry.last_edited_time,
           }
         }]
-      }
+    }
     return []
   }
 
   async _getDb(state: CMS): Promise<CMS> {
     let stateWithDb = _.cloneDeep(state)
-    let entryPool = {} as {[x: string] : Object}
+    let entryPool = {} as { [x: string]: Object }
     const db = await this.limiter.schedule(
-      async () => await this.notionClient.databases.query({database_id: state.metadata.databaseId})
+      async () => await this.notionClient.databases.query({ database_id: state.metadata.databaseId })
     )
     const publishedFilter = (e: PageObjectResponse) => {
       const publishProp = e.properties['Published'] as SelectPropertyItemObjectResponse
       return this.draftMode ? true : publishProp.select && publishProp.select.name === 'Published'
     }
 
-    const tlds: PageObjectResponse[] = _(db.results).filter(this._isTopLevelDir).filter(publishedFilter)
+    const tlds: PageObjectResponse[] = _(db.results).filter(this._isTopLevelDir).filter(publishedFilter).value()
     let subPages: PageObjectResponse[] = _.reject(db.results, this._isTopLevelDir).filter(publishedFilter)
 
     tlds.forEach(directory => {
@@ -361,8 +360,8 @@ export default class NotionCMS {
         const updateObject = this._findByKey(stateWithDb.siteData, parentRoute)
         if (typeof route === 'string') {
           if (updateObject) {
-              updateObject[route] = update as Page
-              remove = true
+            updateObject[route] = update as Page
+            remove = true
           } else {
             entryPool[route] = update
             for (const storedEntry of _.entries(entryPool)) {
@@ -396,11 +395,11 @@ export default class NotionCMS {
     }
     // Use refresh time to see if we should return local env cache or fresh api calls from Notion
     if (cachedCMS && cachedCMS.lastUpdateTimestamp &&
-        Date.now() < (cachedCMS.lastUpdateTimestamp + this.refreshTimeout)) {
-        if(this.debug) console.log('using cache')
-        this.cms = cachedCMS
+      Date.now() < (cachedCMS.lastUpdateTimestamp + this.refreshTimeout)) {
+      if (this.debug) console.log('using cache')
+      this.cms = cachedCMS
     } else {
-      if(this.debug) console.log('using API')
+      if (this.debug) console.log('using API')
       // For now clear the cache anytime we re-run the fetch. In the future we want to make the cache clearing dynamically based on 
       // an AgencyKit API flag.
       if (!_.includes(this.cms.stages, 'db')) {
@@ -443,7 +442,7 @@ export default class NotionCMS {
     let access: Page = this.cms.siteData
     for (const segment of segments) {
       //@ts-ignore-next-line
-      access = access['/'+ segment]
+      access = access['/' + segment]
     }
     return access
   }
