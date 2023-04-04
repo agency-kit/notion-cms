@@ -7,11 +7,12 @@
     "require": "./dist/index.js",
     "default": "./dist/index.mjs"
   },
+  "types": "dist/types.d.ts",
   "scripts": {
     "dev": "tsc --watch",
     "watch": "NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 chokidar \"src/**/*.ts\" -c \"rollup -c && npx uvu test\"",
     "test:no-mock": "node test/notion-cms.spec.js true",
-    "build": "rollup -c",
+    "build": "tsc --project ./tsconfig.json && rollup -c",
     "test": "npx uvu test",
     "build:test": "npm run build && npm run test"
   },
@@ -42,19 +43,19 @@
     "walkjs": "^4.0.5"
   },
   "devDependencies": {
-    "tsc": "^2.0.4",
-    "rollup": "^3.19.1",
-    "esbuild": "^0.17.11",
-    "chokidar-cli": "^3.0.0",
-    "chokidar": "^3.5.3",
-    "rollup-plugin-esbuild": "^5.0.0",
-    "@rollup/plugin-terser": "^0.4.0",
-    "bottleneck": "^2.19.5",
     "@notion-stuff/v4-types": "^6.0.0",
+    "@rollup/plugin-terser": "^0.4.0",
     "@types/lodash": "^4.14.191",
+    "bottleneck": "^2.19.5",
+    "chokidar": "^3.5.3",
+    "chokidar-cli": "^3.0.0",
     "dotenv": "^16.0.3",
+    "esbuild": "^0.17.11",
     "nock": "^13.3.0",
+    "rollup": "^3.19.1",
+    "rollup-plugin-esbuild": "^5.0.0",
     "terser": "^5.16.6",
+    "tsc": "^2.0.4",
     "uvu": "^0.5.6"
   }
 }
