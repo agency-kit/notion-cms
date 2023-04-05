@@ -16,7 +16,8 @@ import type {
   PageObjectUser,
   PageMultiSelect,
   PageRichText,
-  Plugin
+  Plugin,
+  PluginPassthrough,
 } from "./types"
 import _ from 'lodash'
 import fs from 'fs'
@@ -87,7 +88,7 @@ export default class NotionCMS {
     rootUrl,
     limiter,
     plugins
-  }: Options = { databaseId: '', notionAPIKey: '', debug: false, rootUrl: '', draftMode: false }, previousState: string) {
+  }: Options = { databaseId: '', notionAPIKey: '', debug: false, rootUrl: '', draftMode: false }, previousState?: string) {
     this.cms = previousState && this.import(previousState) || {
       metadata: {
         databaseId,
@@ -136,8 +137,8 @@ export default class NotionCMS {
     return Object.entries(this.cms.siteData)
   }
 
-  async _runPlugins(context: Blocks | CMS | string, hook: 'pre-tree' | 'pre-parse' | 'post-parse' | 'post-tree')
-    : Promise<Blocks | string | CMS> {
+  async _runPlugins(context: PluginPassthrough, hook: 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree')
+    : Promise<PluginPassthrough> {
     if (!this.plugins?.length) return context
     let val = context
     for (const plugin of this.plugins) {
@@ -286,6 +287,7 @@ export default class NotionCMS {
               updateObject.coverImage = imageUrl || undefined
             }
           }
+          updateObject = await this._runPlugins(updateObject, 'during-tree') as Page
         }
       }
     })

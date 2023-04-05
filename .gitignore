@@ -2,3 +2,4 @@ node_modules
 .env
 debug
 dist
+index.d.ts

@@ -2,17 +2,19 @@
   "name": "@agency-kit/notion-cms",
   "version": "0.1.4",
   "description": "turn notion into a content management system with this utility set.",
-  "main": "dist/index.js",
+  "main": "./dist/index.js",
   "exports": {
     "require": "./dist/index.js",
     "default": "./dist/index.mjs"
   },
-  "types": "dist/types.d.ts",
+  "module": "./dist/index.mjs",
+  "types": "./index.d.ts",
   "scripts": {
     "dev": "tsc --watch",
-    "watch": "NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 chokidar \"src/**/*.ts\" -c \"rollup -c && npx uvu test\"",
+    "watch": "NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 chokidar \"src/**/*.ts\" -c \"rollup -c && tsc --project ./tsconfig.json && npx uvu test\"",
     "test:no-mock": "node test/notion-cms.spec.js true",
-    "build": "tsc --project ./tsconfig.json && rollup -c",
+    "build": "rm -rf dist && tsc --project ./tsconfig.json && rollup -c && npm run dts",
+    "dts": "dts-bundle-generator -o index.d.ts src/index.ts --no-check && rm -rf .tmp",
     "test": "npx uvu test",
     "build:test": "npm run build && npm run test"
   },
@@ -50,6 +52,7 @@
     "chokidar": "^3.5.3",
     "chokidar-cli": "^3.0.0",
     "dotenv": "^16.0.3",
+    "dts-bundle-generator": "^8.0.0",
     "esbuild": "^0.17.11",
     "nock": "^13.3.0",
     "rollup": "^3.19.1",
