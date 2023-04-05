@@ -1,6 +1,7 @@
 import {
   RichTextItemResponse,
-  PersonUserObjectResponse
+  PersonUserObjectResponse,
+  PageObjectResponse
 } from '@notionhq/client/build/src/api-endpoints'
 
 import { Blocks } from '@notion-stuff/v4-types'
@@ -11,6 +12,8 @@ declare global {
     slug: string
   }
 }
+
+export type Properties = Partial<PageObjectResponse['properties']>
 
 export interface Options {
   databaseId: string,
@@ -41,7 +44,9 @@ export type PageContent = {
   name?: string,
   path?: string,
   url?: string,
+  otherProps?: PageObjectResponse['properties'],
   _notion?: {
+    parent?: PageContent,
     id: string,
     last_edited_time: string,
   }
@@ -81,6 +86,16 @@ export type PageMultiSelect = {
   id: string
 }
 
+export type PageSelect = {
+  type: "select";
+  select: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
+  id: string;
+}
+
 export type PageRichText = {
   type: "rich_text";
   rich_text: Array<RichTextItemResponse>;
@@ -91,9 +106,11 @@ export type Cover = { type: "external"; external: { url: string } } | { type: "f
 
 export type RouteObject = [string, object]
 
+export type PluginPassthrough = Blocks | CMS | Page | string
+
 export interface Plugin {
   name: string,
   core: boolean,
-  hook: 'pre-tree' | 'pre-parse' | 'post-parse' | 'post-tree'
-  exec: (context: Blocks | string | CMS) => Blocks | string | CMS
+  hook: 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree'
+  exec: (context: PluginPassthrough) => PluginPassthrough
 }
