@@ -18,12 +18,13 @@ import type {
   PageRichText,
   Plugin,
   PluginPassthrough,
+  PageContent,
 } from "./types"
 import _ from 'lodash'
 import fs from 'fs'
 import path, { dirname } from 'path'
 import { fileURLToPath } from 'url';
-import { WalkBuilder } from 'walkjs'
+import { WalkBuilder, WalkNode } from 'walkjs'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,6 +65,13 @@ Object.defineProperty(String.prototype, "route", {
   }
 })
 
+interface FlatListItem {
+  _key: string,
+  [pid: string]: string
+}
+
+type FlatList = FlatListItem[]
+
 export default class NotionCMS {
   cms: CMS
   cmsId: string
@@ -77,6 +85,7 @@ export default class NotionCMS {
   debug: boolean | undefined
   limiter: { schedule: Function }
   plugins: Array<Plugin> | undefined
+  pageLookup: Map<string, PageContent>
 
   constructor({
     databaseId,
@@ -113,6 +122,7 @@ export default class NotionCMS {
     this.debug = debug
     this.limiter = limiter || { schedule: (func: Function) => { const result = func(); return Promise.resolve(result) } }
     this.plugins = plugins
+    this.pageLookup = new Map()
     this.limiter.schedule.bind(limiter)
   }
 
@@ -167,6 +177,37 @@ export default class NotionCMS {
     return results
   }
 
+  _flatListToTree = (
+    flatList: FlatList,
+    idPath: keyof FlatListItem,
+    parentIdPath: keyof FlatListItem,
+    isRoot: (t: FlatListItem) => boolean,
+  ): Record<string, Page> => {
+    const rootParents: FlatList = [];
+    const map: any = {};
+    const tree = {}
+    for (const item of flatList) {
+      map[item[idPath]] = item;
+    }
+    for (const item of flatList) {
+      const parentId = item[parentIdPath];
+      if (isRoot(item)) {
+        rootParents.push(item);
+      } else {
+        const parentItem = map[parentId];
+        parentItem[item._key] = item;
+      }
+    }
+    _.forEach(rootParents, page => {
+      _.assign(tree, { [page._key]: page })
+    })
+    return tree;
+  };
+
+  _notionListToTree(list: FlatList): Record<string, Page> {
+    return this._flatListToTree(list, 'id', 'pid', (node: FlatListItem) => !node.pid)
+  }
+
   _isTopLevelDir(response: PageObjectResponse): boolean {
     const parentPage = response?.properties['parent-page'] as PageObjectRelation
     return _.isEmpty(parentPage.relation)
@@ -174,7 +215,7 @@ export default class NotionCMS {
 
   _getParentPageId(response: PageObjectResponse): string {
     const parentPage = response?.properties['parent-page'] as PageObjectRelation
-    return parentPage.relation[0].id
+    return parentPage?.relation[0]?.id
   }
 
   _getBlockName(response: PageObjectResponse): string {
@@ -190,6 +231,13 @@ export default class NotionCMS {
   _assignTagGroup(tag: string, route: string, cms: CMS): void {
     if (!cms.tagGroups[tag]) cms.tagGroups[tag] = []
     cms.tagGroups[tag].push(route)
+  }
+
+  _buildTagGroups(tags: Array<string>, route: string, cms: CMS): void {
+    _.forEach(tags, tag => {
+      if (!_.includes(cms.tags, tag)) cms.tags.push(tag)
+      this._assignTagGroup(tag, route, cms)
+    })
   }
 
   _findByKey(object: Record<string, Page>, key: string): Record<string, Page> | undefined {
@@ -317,7 +365,7 @@ export default class NotionCMS {
       .fromPairs().value()
   }
 
-  _getPageUpdate(entry: PageObjectResponse, cms: CMS): Array<string | Page> {
+  _getPageUpdate(entry: PageObjectResponse): Array<string | Page> {
     const tags = [] as Array<string>
     if (isFullPage(entry as PageObjectResponse)) {
       const name = this._getBlockName(entry)
@@ -334,11 +382,7 @@ export default class NotionCMS {
 
       const coverImage = this._getCoverImage(entry as PageObjectResponse)
       const extractedTags = this._extractTags(entry as PageObjectResponse)
-      extractedTags.forEach(tag => {
-        tags.push(tag)
-        if (!_.includes(cms.tags, tag)) cms.tags.push(tag)
-        this._assignTagGroup(tag, name.slug.route, cms)
-      })
+      extractedTags.forEach(tag => tags.push(tag))
       const otherProps = this._extractUnsteadyProps(entry.properties)
 
       return [
@@ -361,57 +405,48 @@ export default class NotionCMS {
     return []
   }
 
+  _publishedFilter = (e: PageObjectResponse) => {
+    const publishProp = e.properties['Published'] as SelectPropertyItemObjectResponse
+    return this.draftMode ? true : publishProp.select && publishProp.select.name === 'Published'
+  }
+
   async _getDb(state: CMS): Promise<CMS> {
     let stateWithDb = _.cloneDeep(state)
-    let entryPool = {} as { [x: string]: Object }
     const db = await this.limiter.schedule(
       async () => await this.notionClient.databases.query({ database_id: state.metadata.databaseId })
     )
-    const publishedFilter = (e: PageObjectResponse) => {
-      const publishProp = e.properties['Published'] as SelectPropertyItemObjectResponse
-      return this.draftMode ? true : publishProp.select && publishProp.select.name === 'Published'
-    }
 
-    const tlds: PageObjectResponse[] = _(db.results).filter(this._isTopLevelDir).filter(publishedFilter).value()
-    let subPages: PageObjectResponse[] = _.reject(db.results, this._isTopLevelDir).filter(publishedFilter)
+    stateWithDb.siteData = this._notionListToTree(
+      _(db.results)
+        .filter(this._publishedFilter)
+        .map(page => _.assign({}, {
+          _key: this._getBlockName(page).slug.route,
+          id: page.id,
+          pid: this._getParentPageId(page),
+          _notion: page
+        }))
+        .value()
+    )
 
-    tlds.forEach(directory => {
-      const [route, update] = this._getPageUpdate(directory, stateWithDb)
-      if (typeof route === 'string') stateWithDb.siteData[route] = update as Page
-    })
-
-    do {
-      for (const subPage of subPages) {
-        let remove = false
-        const [route, update] = this._getPageUpdate(subPage as PageObjectResponse, stateWithDb)
-        const parentId = this._getParentPageId(subPage)
-        const parent = _.find(db.results, result => result.id === parentId)
-        const parentRoute = this._getBlockName(parent).slug.route
-        const updateObject = this._findByKey(stateWithDb.siteData, parentRoute)
-        if (typeof route === 'string') {
-          if (updateObject) {
-            updateObject[route] = update as Page
-            remove = true
-          } else {
-            entryPool[route] = update
-            for (const storedEntry of _.entries(entryPool)) {
-              const [key, value] = storedEntry
-              if (key === parentRoute) {
-                _.assign(value, update)
-                remove = true
-              } else {
-                const updateObject = this._findByKey(value as Record<string, Page>, parentRoute)
-                if (updateObject) {
-                  updateObject[route] = update as Page
-                  remove = true
-                }
-              }
-            }
+    new WalkBuilder()
+      .withCallback({
+        nodeTypeFilters: ['object'],
+        callback: (node: WalkNode) => {
+          if (!node.val?._notion) return
+          // Main Content
+          const [route, update] = this._getPageUpdate(node.val._notion as PageObjectResponse)
+          _.assign(node.val, update)
+          // Tag Groups
+          if (node.key && typeof node.key === 'string') {
+            this._buildTagGroups(node.val.tags, node.key, stateWithDb)
           }
+          // set Ref in lookup table
+          this.pageLookup.set(node.val.id, node.val)
         }
-        if (remove) subPages = _.pull(subPages, subPage)
-      }
-    } while (subPages.length)
+      })
+      .withRootObjectCallbacks(false)
+      .walk(stateWithDb)
+    console.log(this.pageLookup, 'pages')
 
     stateWithDb.stages.push('db')
     stateWithDb = await this._runPlugins(stateWithDb, 'pre-tree') as CMS
