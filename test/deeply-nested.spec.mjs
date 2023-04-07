@@ -15,11 +15,11 @@ const testCMS = new NotionCMS({
   databaseId: '43a6b925-8c2d-49ef-9d40-95d09707160b',
   notionAPIKey: process.env.NOTION,
   draftMode: true,
-  debug: true
+  debug: true,
 })
 
 await testCMS.fetch()
 
-console.log(util.inspect(testCMS, true, null, true), 'deeply nested')
+// console.log(util.inspect(testCMS.queryByPath('/team/mordecai/blog/post-c')._ancestors, true, null, true), 'deeply nested')
 
 

@@ -37,13 +37,14 @@ export interface CMS {
   routes: Array<string | Array<string>>,
   tags: Array<string>,
   tagGroups: Record<string, Array<string>>
-  siteData: Record<string, Page>
+  siteData: Record<string, Page> | string
 }
 
 export type PageContent = {
   name?: string,
   path?: string,
   url?: string,
+  _ancestors: Page[],
   otherProps?: PageObjectResponse['properties'],
   _notion?: {
     parent?: PageContent,

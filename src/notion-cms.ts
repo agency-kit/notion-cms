@@ -24,7 +24,8 @@ import _ from 'lodash'
 import fs from 'fs'
 import path, { dirname } from 'path'
 import { fileURLToPath } from 'url';
-import { WalkBuilder, WalkNode } from 'walkjs'
+import { AsyncWalkBuilder, WalkBuilder, WalkNode } from 'walkjs'
+import { default as serializeJS } from 'serialize-javascript'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,7 +36,6 @@ const STEADY_PROPS = [
   "name",
   "Author",
   "Published",
-  "Template",
   "Tags",
   "Layout",
   "publishDate",
@@ -47,6 +47,28 @@ const STEADY_PROPS = [
   "parent-page",
   "sub-page"
 ]
+
+function _deserialize(serializedJavascript: string) {
+  return eval?.('(' + serializedJavascript + ')');
+}
+
+function JSONStringifyWithFunctions(obj: Object): string {
+  return JSON.stringify(obj, (key, value) => {
+    // TODO: fix circular references caused by ancestors - these won't get revived right now.
+    if (key === '_ancestors') return '[circular]'
+    return typeof value === 'function' ?
+      '__func__' + serializeJS(value) :
+      value
+  })
+}
+
+function JSONParseWithFunctions(string: string): Object {
+  return JSON.parse(string, (key, value) => {
+    return typeof value === 'string' && value.startsWith('__func__') ?
+      _deserialize(value.replace('__func__', '')) :
+      value
+  })
+}
 
 function writeFile(path: string, contents: string): void {
   fs.mkdirSync(dirname(path), { recursive: true })
@@ -85,7 +107,6 @@ export default class NotionCMS {
   debug: boolean | undefined
   limiter: { schedule: Function }
   plugins: Array<Plugin> | undefined
-  pageLookup: Map<string, PageContent>
 
   constructor({
     databaseId,
@@ -122,7 +143,6 @@ export default class NotionCMS {
     this.debug = debug
     this.limiter = limiter || { schedule: (func: Function) => { const result = func(); return Promise.resolve(result) } }
     this.plugins = plugins
-    this.pageLookup = new Map()
     this.limiter.schedule.bind(limiter)
   }
 
@@ -240,9 +260,10 @@ export default class NotionCMS {
     })
   }
 
+  // TODO: get rid of _findByKey
   _findByKey(object: Record<string, Page>, key: string): Record<string, Page> | undefined {
     let value;
-    Object.keys(object).some((k: string) => {
+    Object.keys(object).filter(e => e !== '_ancestors').some((k: string) => {
       if (k === key) {
         value = object[k];
         return true;
@@ -299,54 +320,39 @@ export default class NotionCMS {
     return []
   }
 
-  async _crawlRoutes(tree: Object, fn: Function): Promise<void> {
-    for (const node of _.entries(tree)) {
-      const [key, value] = node
-      if (_.startsWith(key, '/')) {
-        if (this.debug) console.log(key, 'currently updating')
-        await fn(node)
-        await this._crawlRoutes(value, fn)
-      }
-    }
-  }
 
   async _getPageContent(state: CMS): Promise<CMS> {
     let stateWithContent = _.cloneDeep(state)
-    // can this async recursion be more performant?
-    await this._crawlRoutes(stateWithContent.siteData, async (node: Array<string | Page>) => {
-      let content
-      const [key, value] = node
-      let updateObject =
-        typeof key === 'string' ?
-          this._findByKey(stateWithContent.siteData, key) as Page :
-          undefined
-      if (typeof value !== 'string') {
-        if (value._notion) content = await this._pullPageContent(value._notion.id)
-        if (updateObject) {
-          const path = this._getFullPath(key as string)
-          updateObject.path = path
-          updateObject.url = this.cms.metadata.rootUrl && path ? this.cms.metadata.rootUrl + path : ''
-          if (content) {
-            updateObject.content = content
-            // Add path to content - can't do it before because siteData doesn't exist.
-            // In case there was no cover image property, lets fall back to the first image in the html 
-            if (updateObject?.coverImage === undefined) {
-              const imageUrl = content.match(COVER_IMAGE_REGEX)?.[1]
-              updateObject.coverImage = imageUrl || undefined
-            }
-          }
-          updateObject = await this._runPlugins(updateObject, 'during-tree') as Page
+
+    await new AsyncWalkBuilder()
+      .withCallback({
+        nodeTypeFilters: ['object'],
+        callback: async node => {
+          if (!node.val?._notion) return
+          const content = await this._pullPageContent(node.val._notion.id)
+          const imageUrl = content.match(COVER_IMAGE_REGEX)?.[1]
+          _.assign(node.val, {
+            content,
+            coverImage: imageUrl,
+            _ancestors: this._gatherNodeAncestors(node)
+          })
+          _.assign(
+            node.val,
+            await this._runPlugins(node.val, 'during-tree') as Page)
         }
-      }
-    })
+      })
+      .withRootObjectCallbacks(false)
+      .withParallelizeAsyncCallbacks(true)
+      .walk(stateWithContent.siteData)
 
     stateWithContent.stages.push('content')
     stateWithContent = await this._runPlugins(stateWithContent, 'post-tree') as CMS
     return stateWithContent
   }
 
-  _getFullPath(key: string) {
+  _getFullPath(key: string): string | undefined {
     let path
+    if (typeof this.cms.siteData === 'string') return
     const matchNode = this._findByKey(this.cms.siteData, key)
     new WalkBuilder()
       .withGlobalFilter(node => typeof node?.key === 'string' && node?.key?.startsWith('/'))
@@ -391,6 +397,7 @@ export default class NotionCMS {
           name,
           metaTitle,
           otherProps,
+          _ancestors: [],
           metaDescription,
           slug: name.slug,
           authors,
@@ -408,6 +415,12 @@ export default class NotionCMS {
   _publishedFilter = (e: PageObjectResponse) => {
     const publishProp = e.properties['Published'] as SelectPropertyItemObjectResponse
     return this.draftMode ? true : publishProp.select && publishProp.select.name === 'Published'
+  }
+
+  _gatherNodeAncestors(node: WalkNode): Array<PageContent> {
+    return _(node.ancestors).map(ancestor => {
+      if (ancestor.val._notion) return ancestor.val
+    }).compact().value()
   }
 
   async _getDb(state: CMS): Promise<CMS> {
@@ -440,13 +453,16 @@ export default class NotionCMS {
           if (node.key && typeof node.key === 'string') {
             this._buildTagGroups(node.val.tags, node.key, stateWithDb)
           }
-          // set Ref in lookup table
-          this.pageLookup.set(node.val.id, node.val)
+          // set ancestors in node
+          _.assign(node.val, {
+            path: node.getPath(),
+            url: stateWithDb.metadata.rootUrl && path ?
+              stateWithDb.metadata.rootUrl as string + path : ''
+          })
         }
       })
       .withRootObjectCallbacks(false)
       .walk(stateWithDb)
-    console.log(this.pageLookup, 'pages')
 
     stateWithDb.stages.push('db')
     stateWithDb = await this._runPlugins(stateWithDb, 'pre-tree') as CMS
@@ -465,8 +481,6 @@ export default class NotionCMS {
       this.cms = cachedCMS
     } else {
       if (this.debug) console.log('using API')
-      // For now clear the cache anytime we re-run the fetch. In the future we want to make the cache clearing dynamically based on 
-      // an AgencyKit API flag.
       if (!_.includes(this.cms.stages, 'db')) {
         this.cms = await this._getDb(this.cms)
       }
@@ -479,7 +493,7 @@ export default class NotionCMS {
       }
     }
     void this.routes
-    if (this.debug) writeFile('debug/site-data.json', JSON.stringify(this.cms))
+    if (this.debug) writeFile('debug/site-data.json', JSONStringifyWithFunctions(this.cms))
     return this.cms
   }
 
@@ -489,12 +503,15 @@ export default class NotionCMS {
     for (const tag of tags) {
       taggedPages.push(...this.cms.tagGroups[tag])
     }
-    return _(taggedPages).map(page => this._findByKey(this.cms.siteData, page)).uniq().value()
+    if (typeof this.cms.siteData !== 'string') {
+      return _(taggedPages).map(page => this._findByKey(this.cms.siteData as Record<string, Page>, page)).uniq().value()
+    }
+    return []
   }
 
   filterSubPages(key: string | Page): Array<Page> {
     let page
-    if (typeof key === 'string') {
+    if (typeof key === 'string' && typeof this.cms.siteData !== 'string') {
       page = this._findByKey(this.cms.siteData, key)
     }
     return Object.entries(page || key)
@@ -515,10 +532,10 @@ export default class NotionCMS {
 
   export() {
     this.cms.lastUpdateTimestamp = Date.now()
-    return JSON.stringify(this.cms)
+    return JSONStringifyWithFunctions(this.cms)
   }
 
   import(previousState: string): CMS {
-    return JSON.parse(previousState)
+    return JSONParseWithFunctions(previousState) as CMS
   }
 }
