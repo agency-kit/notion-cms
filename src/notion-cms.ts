@@ -26,6 +26,7 @@ import path, { dirname } from 'path'
 import { fileURLToPath } from 'url';
 import { AsyncWalkBuilder, WalkBuilder, WalkNode } from 'walkjs'
 import { default as serializeJS } from 'serialize-javascript'
+import { parse, stringify } from 'flatted';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,22 +53,29 @@ function _deserialize(serializedJavascript: string) {
   return eval?.('(' + serializedJavascript + ')');
 }
 
+function _replaceFuncs(key: string, value: any) {
+  return typeof value === 'function' ?
+    '__func__' + serializeJS(value) :
+    value
+}
+
+function _reviveFuncs(key: string, value: any) {
+  return typeof value === 'string' && value.startsWith('__func__') ?
+    _deserialize(value.replace('__func__', '')) :
+    value
+}
+
+function _filterAncestors(key: string, value: any) {
+  if (key === '_ancestors') return '[ancestors ref]'
+  return value
+}
+
 function JSONStringifyWithFunctions(obj: Object): string {
-  return JSON.stringify(obj, (key, value) => {
-    // TODO: fix circular references caused by ancestors - these won't get revived right now.
-    if (key === '_ancestors') return '[circular]'
-    return typeof value === 'function' ?
-      '__func__' + serializeJS(value) :
-      value
-  })
+  return stringify(obj, _replaceFuncs)
 }
 
 function JSONParseWithFunctions(string: string): Object {
-  return JSON.parse(string, (key, value) => {
-    return typeof value === 'string' && value.startsWith('__func__') ?
-      _deserialize(value.replace('__func__', '')) :
-      value
-  })
+  return parse(string, _reviveFuncs)
 }
 
 function writeFile(path: string, contents: string): void {
@@ -489,7 +497,7 @@ export default class NotionCMS {
         this.cms.stages.push('complete')
       }
       if (_.includes(this.cms.stages, 'complete')) {
-        writeFile(this.localCacheUrl, this.export())
+        this.export()
       }
     }
     void this.routes
@@ -530,9 +538,15 @@ export default class NotionCMS {
     return access
   }
 
-  export() {
+  export({ pretty = false, path = this.localCacheUrl }:
+    { pretty?: boolean, path?: string } = {}) {
     this.cms.lastUpdateTimestamp = Date.now()
-    return JSONStringifyWithFunctions(this.cms)
+    if (pretty) {
+      // This drops Functions too, so only use for inspection
+      writeFile(path, JSON.stringify(this.cms, _filterAncestors))
+    } else {
+      writeFile(path, JSONStringifyWithFunctions(this.cms))
+    }
   }
 
   import(previousState: string): CMS {

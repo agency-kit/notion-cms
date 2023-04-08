@@ -1,6 +1,7 @@
 import NotionCMS from '../dist/index.mjs'
 import dotenv from 'dotenv'
 import util from 'util'
+import fs from 'fs'
 
 const noMock = process.argv[2]
 
@@ -20,6 +21,18 @@ const testCMS = new NotionCMS({
 
 await testCMS.fetch()
 
-// console.log(util.inspect(testCMS.queryByPath('/team/mordecai/blog/post-c')._ancestors, true, null, true), 'deeply nested')
+console.log(util.inspect(testCMS.cms.siteData), 'deeply nested')
+
+testCMS.export()
+
+setTimeout(() => {
+  const file = fs.readFileSync('./debug/site-data.json', 'utf-8')
+
+  testCMS.import(file)
+
+  console.log(util.inspect(testCMS.cms.siteData), 'deeply nested after import')
+
+}, 10000)
 
 
+testCMS.export({ pretty: true, path: './debug/jason.json' })
