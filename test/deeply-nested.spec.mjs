@@ -1,7 +1,6 @@
 import NotionCMS from '../dist/index.mjs'
 import dotenv from 'dotenv'
-import util from 'util'
-import fs from 'fs'
+import { setTimeout } from 'timers/promises';
 
 const noMock = process.argv[2]
 
@@ -21,18 +20,17 @@ const testCMS = new NotionCMS({
 
 await testCMS.fetch()
 
-console.log(util.inspect(testCMS.cms.siteData), 'deeply nested')
+// testCMS.walk(
+//   (node) => console.log(node.path, 'node path')
+// )
 
-testCMS.export()
+console.log(testCMS.routes, 'routs')
 
-setTimeout(() => {
-  const file = fs.readFileSync('./debug/site-data.json', 'utf-8')
+await testCMS.asyncWalk(
+  async (node) => {
+    const res = await setTimeout(1000, node.path)
+    console.log(res)
+  }
+)
 
-  testCMS.import(file)
-
-  console.log(util.inspect(testCMS.cms.siteData), 'deeply nested after import')
-
-}, 10000)
-
-
-testCMS.export({ pretty: true, path: './debug/jason.json' })
+console.log('waited on walk')

@@ -95,13 +95,20 @@ See actual plugins for more in depth examples.
 ## Some Helper methods
 
 ```javascript
-
-// returns an array of only child pages of a page looked up using the key.
-myCMS.filterSubPages('/path-segment' /* or Page reference*/)
-
 // returns page reference
 myCMS.queryByPath('/full/path/to/page')
 
+// returns an array of only child pages of a page looked up using the key.
+// This runs queryByPath under the hood so you can save a step
+myCMS.filterSubPages('/full/path/to/page' /* or Page reference*/)
+
 // Get tagged collections this way or by passing a single tag:
 const tagged = myCoolCMS.getTaggedCollection(['blog', 'programming'])
+
+// walk the CMS from the root node and perform some operation for each node.
+// the node parameter will be of type PageContent so you have access to all of the page data
+myCoolCMS.walk(node => console.log(node))
+
+// for async callbacks
+await myCoolCMS.asyncWalk(async node => await asynchronousFunc())
 ```

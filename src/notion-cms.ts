@@ -24,7 +24,7 @@ import _ from 'lodash'
 import fs from 'fs'
 import path, { dirname } from 'path'
 import { fileURLToPath } from 'url';
-import { AsyncWalkBuilder, WalkBuilder, WalkNode } from 'walkjs'
+import { AsyncCallbackFn, AsyncWalkBuilder, WalkBuilder, WalkNode } from 'walkjs'
 import { default as serializeJS } from 'serialize-javascript'
 import { parse, stringify } from 'flatted';
 
@@ -159,15 +159,10 @@ export default class NotionCMS {
     return this.cms.siteData
   }
 
-  get routes() {
-    if (_.isEmpty(this.cms.siteData)) return
-    if (this.toplevelDirectories) {
-      this.cms.routes = []
-      this.toplevelDirectories.forEach(tld => {
-        this.cms.routes.push(this._genRoutes(tld))
-      })
-      return this.cms.routes = this.cms.routes.flat()
-    }
+  get routes(): Array<string> {
+    const routes = [] as Array<string>
+    this.walk((node: PageContent) => { if (node.path) routes.push(node.path) })
+    return routes
   }
 
   get toplevelDirectories() {
@@ -186,23 +181,6 @@ export default class NotionCMS {
       }
     }
     return val
-  }
-
-  _genRoutes(directory: RouteObject): Array<string> {
-    const results = [] as Array<string>
-    const routePart = directory[0]
-    const routeChildren = _(directory[1]).pickBy((value, key) => _.startsWith(key, '/')).entries().value()
-    if (!routeChildren.length) return [routePart]
-    routeChildren.forEach(childDirectory => {
-      const childRes = this._genRoutes(childDirectory)
-      if (childRes.length) {
-        childRes.forEach(res => results.push(routePart + res))
-      } else {
-        results.push(routePart + childRes)
-      }
-    })
-    results.push(routePart)
-    return results
   }
 
   _flatListToTree = (
@@ -256,32 +234,16 @@ export default class NotionCMS {
     return tagProp.multi_select ? tagProp.multi_select.map(multiselect => multiselect.name) : []
   }
 
-  _assignTagGroup(tag: string, route: string, cms: CMS): void {
+  _assignTagGroup(tag: string, path: string, cms: CMS): void {
     if (!cms.tagGroups[tag]) cms.tagGroups[tag] = []
-    cms.tagGroups[tag].push(route)
+    cms.tagGroups[tag].push(path)
   }
 
-  _buildTagGroups(tags: Array<string>, route: string, cms: CMS): void {
+  _buildTagGroups(tags: Array<string>, path: string, cms: CMS): void {
     _.forEach(tags, tag => {
       if (!_.includes(cms.tags, tag)) cms.tags.push(tag)
-      this._assignTagGroup(tag, route, cms)
+      this._assignTagGroup(tag, path, cms)
     })
-  }
-
-  // TODO: get rid of _findByKey
-  _findByKey(object: Record<string, Page>, key: string): Record<string, Page> | undefined {
-    let value;
-    Object.keys(object).filter(e => e !== '_ancestors').some((k: string) => {
-      if (k === key) {
-        value = object[k];
-        return true;
-      }
-      if (object[k] && typeof object[k] === 'object') {
-        value = this._findByKey(object[k] as Record<string, Page>, key);
-        return value !== undefined;
-      }
-    });
-    return value;
   }
 
   _getCoverImage(page: PageObjectResponse): string | undefined {
@@ -356,19 +318,6 @@ export default class NotionCMS {
     stateWithContent.stages.push('content')
     stateWithContent = await this._runPlugins(stateWithContent, 'post-tree') as CMS
     return stateWithContent
-  }
-
-  _getFullPath(key: string): string | undefined {
-    let path
-    if (typeof this.cms.siteData === 'string') return
-    const matchNode = this._findByKey(this.cms.siteData, key)
-    new WalkBuilder()
-      .withGlobalFilter(node => typeof node?.key === 'string' && node?.key?.startsWith('/'))
-      .withSimpleCallback(node => {
-        if (node.val == matchNode) path = node.getPath(node => `${node.key}`)
-      })
-      .walk(this.cms.siteData)
-    return path
   }
 
   _extractUnsteadyProps(properties: PageObjectResponse['properties'])
@@ -457,16 +406,16 @@ export default class NotionCMS {
           // Main Content
           const [route, update] = this._getPageUpdate(node.val._notion as PageObjectResponse)
           _.assign(node.val, update)
-          // Tag Groups
-          if (node.key && typeof node.key === 'string') {
-            this._buildTagGroups(node.val.tags, node.key, stateWithDb)
-          }
           // set ancestors in node
           _.assign(node.val, {
             path: node.getPath(node => `${node.key}`).replace('siteData', ''),
             url: stateWithDb.metadata.rootUrl && path ?
               stateWithDb.metadata.rootUrl as string + path : ''
           })
+          // Tag Groups
+          if (node.key && typeof node.key === 'string') {
+            this._buildTagGroups(node.val.tags, node.val.path, stateWithDb)
+          }
         }
       })
       .withRootObjectCallbacks(false)
@@ -505,24 +454,59 @@ export default class NotionCMS {
     return this.cms
   }
 
-  getTaggedCollection(tags: string | Array<string>): Array<Record<string, Page> | undefined> {
+  async asyncWalk(cb: Function, path?: string) {
+    // Path param not supported yet. This is because 'graph' mode process nodes outside the specified start point
+    // We need to do something about circular references to the ancestors to support walking in finiteTree mode.
+    // const startPoint = path ? this.queryByPath(path) : this.cms.siteData
+    const startPoint = this.cms.siteData
+    await new AsyncWalkBuilder()
+      .withCallback({
+        nodeTypeFilters: ['object'],
+        filters: [(node: WalkNode) => typeof node.key === 'string' && node?.key?.startsWith('/')],
+        callback: (node: WalkNode) => cb(node.val) as AsyncCallbackFn
+      })
+      .withGraphMode('graph')
+      .withRootObjectCallbacks(false)
+      .withParallelizeAsyncCallbacks(true)
+      .walk(startPoint)
+  }
+
+  walk(cb: Function, path?: string) {
+    // Path param not supported yet. This is because 'graph' mode process nodes outside the specified start point
+    // We need to do something about circular references to the ancestors to support walking in finiteTree mode.
+    // const startPoint = path ? this.queryByPath(path) : this.cms.siteData
+    const startPoint = this.cms.siteData
+    new WalkBuilder()
+      .withCallback({
+        nodeTypeFilters: ['object'],
+        filters: [(node: WalkNode) => typeof node.key === 'string' && node?.key?.startsWith('/')],
+        callback: (node: WalkNode) => cb(node.val)
+      })
+      .withGraphMode('graph')
+      .withRootObjectCallbacks(false)
+      .walk(startPoint)
+  }
+
+  getTaggedCollection(tags: string | Array<string>): Array<Page | undefined> {
     if (!_.isArray(tags)) tags = [tags]
     const taggedPages = [] as Array<string>
     for (const tag of tags) {
       taggedPages.push(...this.cms.tagGroups[tag])
     }
     if (typeof this.cms.siteData !== 'string') {
-      return _(taggedPages).map(page => this._findByKey(this.cms.siteData as Record<string, Page>, page)).uniq().value()
+      return _(taggedPages).map(path => this.queryByPath(path)).uniq().value()
     }
     return []
   }
 
-  filterSubPages(key: string | Page): Array<Page> {
-    let page
-    if (typeof key === 'string' && typeof this.cms.siteData !== 'string') {
-      page = this._findByKey(this.cms.siteData, key)
+  filterSubPages(pathOrPage: string | Page): Array<Page> {
+    // take path instead of path and if there are multiple pages with the same path
+    // throw an error saying you need to specify more path
+    if (typeof pathOrPage === 'string' &&
+      typeof this.cms.siteData !== 'string') {
+      pathOrPage = this.queryByPath(pathOrPage) as Page
     }
-    return Object.entries(page || key)
+    return Object.entries(pathOrPage)
       .filter(([key]) => key.startsWith('/'))
       .map(e => e[1]) as Page[]
   }
