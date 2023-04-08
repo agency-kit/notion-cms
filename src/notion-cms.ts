@@ -463,7 +463,7 @@ export default class NotionCMS {
           }
           // set ancestors in node
           _.assign(node.val, {
-            path: node.getPath(),
+            path: node.getPath(node => `${node.key}`).replace('siteData', ''),
             url: stateWithDb.metadata.rootUrl && path ?
               stateWithDb.metadata.rootUrl as string + path : ''
           })
