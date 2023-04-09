@@ -56,8 +56,6 @@ export type PageContent = {
   tags?: Array<string>,
   coverImage?: string,
   content?: string,
-  metaTitle?: string,
-  metaDescription?: string
 }
 
 export type Route = {

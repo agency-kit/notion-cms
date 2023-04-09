@@ -10,12 +10,10 @@ import type {
   Options,
   CMS,
   Page,
-  RouteObject,
   PageObjectTitle,
   PageObjectRelation,
   PageObjectUser,
   PageMultiSelect,
-  PageRichText,
   Plugin,
   PluginPassthrough,
   PageContent,
@@ -38,13 +36,7 @@ const STEADY_PROPS = [
   "Author",
   "Published",
   "Tags",
-  "Layout",
   "publishDate",
-  "metaTitle",
-  "metaDescription",
-  "canonicalUrl",
-  "social",
-  "postUrl",
   "parent-page",
   "sub-page"
 ]
@@ -290,7 +282,6 @@ export default class NotionCMS {
     return []
   }
 
-
   async _getPageContent(state: CMS): Promise<CMS> {
     let stateWithContent = _.cloneDeep(state)
 
@@ -337,12 +328,6 @@ export default class NotionCMS {
       const authorProp = entry.properties?.Author as PageObjectUser
       const authors = authorProp['people'].map(authorId => authorId.name as string)
 
-      const metaTitleProp = entry.properties?.metaTitle as PageRichText
-      const metaTitle = metaTitleProp?.rich_text[0]?.plain_text
-
-      const metaDescriptionProp = entry.properties?.metaDescription as PageRichText
-      const metaDescription = metaDescriptionProp?.rich_text[0]?.plain_text
-
       const coverImage = this._getCoverImage(entry as PageObjectResponse)
       const extractedTags = this._extractTags(entry as PageObjectResponse)
       extractedTags.forEach(tag => tags.push(tag))
@@ -352,10 +337,8 @@ export default class NotionCMS {
         route,
         {
           name,
-          metaTitle,
           otherProps,
           _ancestors: [],
-          metaDescription,
           slug: name.slug,
           authors,
           tags,
