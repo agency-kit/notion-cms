@@ -1,9 +1,7 @@
-export function removeContent(obj, removalProperty) {
+export function removeCircular(obj) {
   for (const prop in obj) {
-    if (prop === removalProperty)
-      // delete obj[prop];
-      obj[prop] = ''
+    if (prop === '_ancestors') obj[prop] = [];
     else if (typeof obj[prop] === 'object')
-      removeContent(obj[prop], removalProperty);
+      removeCircular(obj[prop]);
   }
 }

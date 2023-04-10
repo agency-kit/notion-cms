@@ -10,20 +10,21 @@ import type {
   Options,
   CMS,
   Page,
-  RouteObject,
   PageObjectTitle,
   PageObjectRelation,
   PageObjectUser,
   PageMultiSelect,
-  PageRichText,
   Plugin,
   PluginPassthrough,
+  PageContent,
 } from "./types"
 import _ from 'lodash'
 import fs from 'fs'
 import path, { dirname } from 'path'
 import { fileURLToPath } from 'url';
-import { WalkBuilder } from 'walkjs'
+import { AsyncCallbackFn, AsyncWalkBuilder, WalkBuilder, WalkNode } from 'walkjs'
+import { default as serializeJS } from 'serialize-javascript'
+import { parse, stringify } from 'flatted';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,18 +35,40 @@ const STEADY_PROPS = [
   "name",
   "Author",
   "Published",
-  "Template",
   "Tags",
-  "Layout",
   "publishDate",
-  "metaTitle",
-  "metaDescription",
-  "canonicalUrl",
-  "social",
-  "postUrl",
   "parent-page",
   "sub-page"
 ]
+
+function _deserialize(serializedJavascript: string) {
+  return eval?.('(' + serializedJavascript + ')');
+}
+
+function _replaceFuncs(key: string, value: any) {
+  return typeof value === 'function' ?
+    '__func__' + serializeJS(value) :
+    value
+}
+
+function _reviveFuncs(key: string, value: any) {
+  return typeof value === 'string' && value.startsWith('__func__') ?
+    _deserialize(value.replace('__func__', '')) :
+    value
+}
+
+function _filterAncestors(key: string, value: any) {
+  if (key === '_ancestors') return '[ancestors ref]'
+  return value
+}
+
+function JSONStringifyWithFunctions(obj: Object): string {
+  return stringify(obj, _replaceFuncs)
+}
+
+function JSONParseWithFunctions(string: string): Object {
+  return parse(string, _reviveFuncs)
+}
 
 function writeFile(path: string, contents: string): void {
   fs.mkdirSync(dirname(path), { recursive: true })
@@ -63,6 +86,13 @@ Object.defineProperty(String.prototype, "route", {
     return this.padStart(this.length + 1, separator)
   }
 })
+
+interface FlatListItem {
+  _key: string,
+  [pid: string]: string
+}
+
+type FlatList = FlatListItem[]
 
 export default class NotionCMS {
   cms: CMS
@@ -121,15 +151,10 @@ export default class NotionCMS {
     return this.cms.siteData
   }
 
-  get routes() {
-    if (_.isEmpty(this.cms.siteData)) return
-    if (this.toplevelDirectories) {
-      this.cms.routes = []
-      this.toplevelDirectories.forEach(tld => {
-        this.cms.routes.push(this._genRoutes(tld))
-      })
-      return this.cms.routes = this.cms.routes.flat()
-    }
+  get routes(): Array<string> {
+    const routes = [] as Array<string>
+    this.walk((node: PageContent) => { if (node.path) routes.push(node.path) })
+    return routes
   }
 
   get toplevelDirectories() {
@@ -150,21 +175,35 @@ export default class NotionCMS {
     return val
   }
 
-  _genRoutes(directory: RouteObject): Array<string> {
-    const results = [] as Array<string>
-    const routePart = directory[0]
-    const routeChildren = _(directory[1]).pickBy((value, key) => _.startsWith(key, '/')).entries().value()
-    if (!routeChildren.length) return [routePart]
-    routeChildren.forEach(childDirectory => {
-      const childRes = this._genRoutes(childDirectory)
-      if (childRes.length) {
-        childRes.forEach(res => results.push(routePart + res))
+  _flatListToTree = (
+    flatList: FlatList,
+    idPath: keyof FlatListItem,
+    parentIdPath: keyof FlatListItem,
+    isRoot: (t: FlatListItem) => boolean,
+  ): Record<string, Page> => {
+    const rootParents: FlatList = [];
+    const map: any = {};
+    const tree = {}
+    for (const item of flatList) {
+      map[item[idPath]] = item;
+    }
+    for (const item of flatList) {
+      const parentId = item[parentIdPath];
+      if (isRoot(item)) {
+        rootParents.push(item);
       } else {
-        results.push(routePart + childRes)
+        const parentItem = map[parentId];
+        parentItem[item._key] = item;
       }
+    }
+    _.forEach(rootParents, page => {
+      _.assign(tree, { [page._key]: page })
     })
-    results.push(routePart)
-    return results
+    return tree;
+  };
+
+  _notionListToTree(list: FlatList): Record<string, Page> {
+    return this._flatListToTree(list, 'id', 'pid', (node: FlatListItem) => !node.pid)
   }
 
   _isTopLevelDir(response: PageObjectResponse): boolean {
@@ -174,7 +213,7 @@ export default class NotionCMS {
 
   _getParentPageId(response: PageObjectResponse): string {
     const parentPage = response?.properties['parent-page'] as PageObjectRelation
-    return parentPage.relation[0].id
+    return parentPage?.relation[0]?.id
   }
 
   _getBlockName(response: PageObjectResponse): string {
@@ -187,24 +226,16 @@ export default class NotionCMS {
     return tagProp.multi_select ? tagProp.multi_select.map(multiselect => multiselect.name) : []
   }
 
-  _assignTagGroup(tag: string, route: string, cms: CMS): void {
+  _assignTagGroup(tag: string, path: string, cms: CMS): void {
     if (!cms.tagGroups[tag]) cms.tagGroups[tag] = []
-    cms.tagGroups[tag].push(route)
+    cms.tagGroups[tag].push(path)
   }
 
-  _findByKey(object: Record<string, Page>, key: string): Record<string, Page> | undefined {
-    let value;
-    Object.keys(object).some((k: string) => {
-      if (k === key) {
-        value = object[k];
-        return true;
-      }
-      if (object[k] && typeof object[k] === 'object') {
-        value = this._findByKey(object[k] as Record<string, Page>, key);
-        return value !== undefined;
-      }
-    });
-    return value;
+  _buildTagGroups(tags: Array<string>, path: string, cms: CMS): void {
+    _.forEach(tags, tag => {
+      if (!_.includes(cms.tags, tag)) cms.tags.push(tag)
+      this._assignTagGroup(tag, path, cms)
+    })
   }
 
   _getCoverImage(page: PageObjectResponse): string | undefined {
@@ -251,62 +282,33 @@ export default class NotionCMS {
     return []
   }
 
-  async _crawlRoutes(tree: Object, fn: Function): Promise<void> {
-    for (const node of _.entries(tree)) {
-      const [key, value] = node
-      if (_.startsWith(key, '/')) {
-        if (this.debug) console.log(key, 'currently updating')
-        await fn(node)
-        await this._crawlRoutes(value, fn)
-      }
-    }
-  }
-
   async _getPageContent(state: CMS): Promise<CMS> {
     let stateWithContent = _.cloneDeep(state)
-    // can this async recursion be more performant?
-    await this._crawlRoutes(stateWithContent.siteData, async (node: Array<string | Page>) => {
-      let content
-      const [key, value] = node
-      let updateObject =
-        typeof key === 'string' ?
-          this._findByKey(stateWithContent.siteData, key) as Page :
-          undefined
-      if (typeof value !== 'string') {
-        if (value._notion) content = await this._pullPageContent(value._notion.id)
-        if (updateObject) {
-          const path = this._getFullPath(key as string)
-          updateObject.path = path
-          updateObject.url = this.cms.metadata.rootUrl && path ? this.cms.metadata.rootUrl + path : ''
-          if (content) {
-            updateObject.content = content
-            // Add path to content - can't do it before because siteData doesn't exist.
-            // In case there was no cover image property, lets fall back to the first image in the html 
-            if (updateObject?.coverImage === undefined) {
-              const imageUrl = content.match(COVER_IMAGE_REGEX)?.[1]
-              updateObject.coverImage = imageUrl || undefined
-            }
-          }
-          updateObject = await this._runPlugins(updateObject, 'during-tree') as Page
+
+    await new AsyncWalkBuilder()
+      .withCallback({
+        nodeTypeFilters: ['object'],
+        callback: async node => {
+          if (!node.val?._notion) return
+          const content = await this._pullPageContent(node.val._notion.id)
+          const imageUrl = content.match(COVER_IMAGE_REGEX)?.[1]
+          _.assign(node.val, {
+            content,
+            coverImage: imageUrl,
+            _ancestors: this._gatherNodeAncestors(node)
+          })
+          _.assign(
+            node.val,
+            await this._runPlugins(node.val, 'during-tree') as Page)
         }
-      }
-    })
+      })
+      .withRootObjectCallbacks(false)
+      .withParallelizeAsyncCallbacks(true)
+      .walk(stateWithContent.siteData)
 
     stateWithContent.stages.push('content')
     stateWithContent = await this._runPlugins(stateWithContent, 'post-tree') as CMS
     return stateWithContent
-  }
-
-  _getFullPath(key: string) {
-    let path
-    const matchNode = this._findByKey(this.cms.siteData, key)
-    new WalkBuilder()
-      .withGlobalFilter(node => typeof node?.key === 'string' && node?.key?.startsWith('/'))
-      .withSimpleCallback(node => {
-        if (node.val == matchNode) path = node.getPath(node => `${node.key}`)
-      })
-      .walk(this.cms.siteData)
-    return path
   }
 
   _extractUnsteadyProps(properties: PageObjectResponse['properties'])
@@ -317,7 +319,7 @@ export default class NotionCMS {
       .fromPairs().value()
   }
 
-  _getPageUpdate(entry: PageObjectResponse, cms: CMS): Array<string | Page> {
+  _getPageUpdate(entry: PageObjectResponse): Array<string | Page> {
     const tags = [] as Array<string>
     if (isFullPage(entry as PageObjectResponse)) {
       const name = this._getBlockName(entry)
@@ -326,28 +328,17 @@ export default class NotionCMS {
       const authorProp = entry.properties?.Author as PageObjectUser
       const authors = authorProp['people'].map(authorId => authorId.name as string)
 
-      const metaTitleProp = entry.properties?.metaTitle as PageRichText
-      const metaTitle = metaTitleProp?.rich_text[0]?.plain_text
-
-      const metaDescriptionProp = entry.properties?.metaDescription as PageRichText
-      const metaDescription = metaDescriptionProp?.rich_text[0]?.plain_text
-
       const coverImage = this._getCoverImage(entry as PageObjectResponse)
       const extractedTags = this._extractTags(entry as PageObjectResponse)
-      extractedTags.forEach(tag => {
-        tags.push(tag)
-        if (!_.includes(cms.tags, tag)) cms.tags.push(tag)
-        this._assignTagGroup(tag, name.slug.route, cms)
-      })
+      extractedTags.forEach(tag => tags.push(tag))
       const otherProps = this._extractUnsteadyProps(entry.properties)
 
       return [
         route,
         {
           name,
-          metaTitle,
           otherProps,
-          metaDescription,
+          _ancestors: [],
           slug: name.slug,
           authors,
           tags,
@@ -361,57 +352,57 @@ export default class NotionCMS {
     return []
   }
 
+  _publishedFilter = (e: PageObjectResponse) => {
+    const publishProp = e.properties['Published'] as SelectPropertyItemObjectResponse
+    return this.draftMode ? true : publishProp.select && publishProp.select.name === 'Published'
+  }
+
+  _gatherNodeAncestors(node: WalkNode): Array<PageContent> {
+    return _(node.ancestors).map(ancestor => {
+      if (ancestor.val._notion) return ancestor.val
+    }).compact().value()
+  }
+
   async _getDb(state: CMS): Promise<CMS> {
     let stateWithDb = _.cloneDeep(state)
-    let entryPool = {} as { [x: string]: Object }
     const db = await this.limiter.schedule(
       async () => await this.notionClient.databases.query({ database_id: state.metadata.databaseId })
     )
-    const publishedFilter = (e: PageObjectResponse) => {
-      const publishProp = e.properties['Published'] as SelectPropertyItemObjectResponse
-      return this.draftMode ? true : publishProp.select && publishProp.select.name === 'Published'
-    }
 
-    const tlds: PageObjectResponse[] = _(db.results).filter(this._isTopLevelDir).filter(publishedFilter).value()
-    let subPages: PageObjectResponse[] = _.reject(db.results, this._isTopLevelDir).filter(publishedFilter)
+    stateWithDb.siteData = this._notionListToTree(
+      _(db.results)
+        .filter(this._publishedFilter)
+        .map(page => _.assign({}, {
+          _key: this._getBlockName(page).slug.route,
+          id: page.id,
+          pid: this._getParentPageId(page),
+          _notion: page
+        }))
+        .value()
+    )
 
-    tlds.forEach(directory => {
-      const [route, update] = this._getPageUpdate(directory, stateWithDb)
-      if (typeof route === 'string') stateWithDb.siteData[route] = update as Page
-    })
-
-    do {
-      for (const subPage of subPages) {
-        let remove = false
-        const [route, update] = this._getPageUpdate(subPage as PageObjectResponse, stateWithDb)
-        const parentId = this._getParentPageId(subPage)
-        const parent = _.find(db.results, result => result.id === parentId)
-        const parentRoute = this._getBlockName(parent).slug.route
-        const updateObject = this._findByKey(stateWithDb.siteData, parentRoute)
-        if (typeof route === 'string') {
-          if (updateObject) {
-            updateObject[route] = update as Page
-            remove = true
-          } else {
-            entryPool[route] = update
-            for (const storedEntry of _.entries(entryPool)) {
-              const [key, value] = storedEntry
-              if (key === parentRoute) {
-                _.assign(value, update)
-                remove = true
-              } else {
-                const updateObject = this._findByKey(value as Record<string, Page>, parentRoute)
-                if (updateObject) {
-                  updateObject[route] = update as Page
-                  remove = true
-                }
-              }
-            }
+    new WalkBuilder()
+      .withCallback({
+        nodeTypeFilters: ['object'],
+        callback: (node: WalkNode) => {
+          if (!node.val?._notion) return
+          // Main Content
+          const [route, update] = this._getPageUpdate(node.val._notion as PageObjectResponse)
+          _.assign(node.val, update)
+          // set ancestors in node
+          _.assign(node.val, {
+            path: node.getPath(node => `${node.key}`).replace('siteData', ''),
+            url: stateWithDb.metadata.rootUrl && path ?
+              stateWithDb.metadata.rootUrl as string + path : ''
+          })
+          // Tag Groups
+          if (node.key && typeof node.key === 'string') {
+            this._buildTagGroups(node.val.tags, node.val.path, stateWithDb)
           }
         }
-        if (remove) subPages = _.pull(subPages, subPage)
-      }
-    } while (subPages.length)
+      })
+      .withRootObjectCallbacks(false)
+      .walk(stateWithDb)
 
     stateWithDb.stages.push('db')
     stateWithDb = await this._runPlugins(stateWithDb, 'pre-tree') as CMS
@@ -430,8 +421,6 @@ export default class NotionCMS {
       this.cms = cachedCMS
     } else {
       if (this.debug) console.log('using API')
-      // For now clear the cache anytime we re-run the fetch. In the future we want to make the cache clearing dynamically based on 
-      // an AgencyKit API flag.
       if (!_.includes(this.cms.stages, 'db')) {
         this.cms = await this._getDb(this.cms)
       }
@@ -440,29 +429,65 @@ export default class NotionCMS {
         this.cms.stages.push('complete')
       }
       if (_.includes(this.cms.stages, 'complete')) {
-        writeFile(this.localCacheUrl, this.export())
+        this.export()
       }
     }
     void this.routes
-    if (this.debug) writeFile('debug/site-data.json', JSON.stringify(this.cms))
+    if (this.debug) writeFile('debug/site-data.json', JSONStringifyWithFunctions(this.cms))
     return this.cms
   }
 
-  getTaggedCollection(tags: string | Array<string>): Array<Record<string, Page> | undefined> {
+  async asyncWalk(cb: Function, path?: string) {
+    // Path param not supported yet. This is because 'graph' mode process nodes outside the specified start point
+    // We need to do something about circular references to the ancestors to support walking in finiteTree mode.
+    // const startPoint = path ? this.queryByPath(path) : this.cms.siteData
+    const startPoint = this.cms.siteData
+    await new AsyncWalkBuilder()
+      .withCallback({
+        nodeTypeFilters: ['object'],
+        filters: [(node: WalkNode) => typeof node.key === 'string' && node?.key?.startsWith('/')],
+        callback: (node: WalkNode) => cb(node.val) as AsyncCallbackFn
+      })
+      .withGraphMode('graph')
+      .withRootObjectCallbacks(false)
+      .withParallelizeAsyncCallbacks(true)
+      .walk(startPoint)
+  }
+
+  walk(cb: Function, path?: string) {
+    // Path param not supported yet. This is because 'graph' mode process nodes outside the specified start point
+    // We need to do something about circular references to the ancestors to support walking in finiteTree mode.
+    // const startPoint = path ? this.queryByPath(path) : this.cms.siteData
+    const startPoint = this.cms.siteData
+    new WalkBuilder()
+      .withCallback({
+        nodeTypeFilters: ['object'],
+        filters: [(node: WalkNode) => typeof node.key === 'string' && node?.key?.startsWith('/')],
+        callback: (node: WalkNode) => cb(node.val)
+      })
+      .withGraphMode('graph')
+      .withRootObjectCallbacks(false)
+      .walk(startPoint)
+  }
+
+  getTaggedCollection(tags: string | Array<string>): Array<Page | undefined> {
     if (!_.isArray(tags)) tags = [tags]
     const taggedPages = [] as Array<string>
     for (const tag of tags) {
       taggedPages.push(...this.cms.tagGroups[tag])
     }
-    return _(taggedPages).map(page => this._findByKey(this.cms.siteData, page)).uniq().value()
+    if (typeof this.cms.siteData !== 'string') {
+      return _(taggedPages).map(path => this.queryByPath(path)).uniq().value()
+    }
+    return []
   }
 
-  filterSubPages(key: string | Page): Array<Page> {
-    let page
-    if (typeof key === 'string') {
-      page = this._findByKey(this.cms.siteData, key)
+  filterSubPages(pathOrPage: string | Page): Array<Page> {
+    if (typeof pathOrPage === 'string' &&
+      typeof this.cms.siteData !== 'string') {
+      pathOrPage = this.queryByPath(pathOrPage) as Page
     }
-    return Object.entries(page || key)
+    return Object.entries(pathOrPage)
       .filter(([key]) => key.startsWith('/'))
       .map(e => e[1]) as Page[]
   }
@@ -478,12 +503,18 @@ export default class NotionCMS {
     return access
   }
 
-  export() {
+  export({ pretty = false, path = this.localCacheUrl }:
+    { pretty?: boolean, path?: string } = {}) {
     this.cms.lastUpdateTimestamp = Date.now()
-    return JSON.stringify(this.cms)
+    if (pretty) {
+      // This drops Functions too, so only use for inspection
+      writeFile(path, JSON.stringify(this.cms, _filterAncestors))
+    } else {
+      writeFile(path, JSONStringifyWithFunctions(this.cms))
+    }
   }
 
   import(previousState: string): CMS {
-    return JSON.parse(previousState)
+    return JSONParseWithFunctions(previousState) as CMS
   }
 }

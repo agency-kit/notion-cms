@@ -15,7 +15,7 @@
     "test:no-mock": "node test/notion-cms.spec.js true",
     "build": "rm -rf dist && tsc --project ./tsconfig.json && rollup -c && npm run dts",
     "dts": "dts-bundle-generator -o index.d.ts src/index.ts --no-check && rm -rf .tmp",
-    "test": "npx uvu test",
+    "test": "NODE_OPTIONS=--enable-source-maps npx c8 uvu test",
     "build:test": "npm run build && npm run test"
   },
   "repository": {
@@ -35,12 +35,15 @@
   },
   "homepage": "https://github.com/agency-kit/notion-cms#readme",
   "dependencies": {
+    "@changesets/cli": "^2.26.1",
     "@notion-stuff/blocks-html-parser": "^6.0.0",
     "@notion-stuff/blocks-markdown-parser": "^6.0.0",
     "@notionhq/client": "^2.2.3",
+    "flatted": "^3.2.7",
     "highlight.js": "^11.7.0",
     "lodash": "^4.17.21",
     "marked": "^4.2.12",
+    "serialize-javascript": "^6.0.1",
     "tslib": "^2.5.0",
     "walkjs": "^4.0.5"
   },
@@ -48,7 +51,9 @@
     "@notion-stuff/v4-types": "^6.0.0",
     "@rollup/plugin-terser": "^0.4.0",
     "@types/lodash": "^4.14.191",
+    "@types/serialize-javascript": "^5.0.2",
     "bottleneck": "^2.19.5",
+    "c8": "^7.13.0",
     "chokidar": "^3.5.3",
     "chokidar-cli": "^3.0.0",
     "dotenv": "^16.0.3",

@@ -12,7 +12,7 @@ Requires `>=node 19`
 
 Notion excels at managing content. It also has a great API and SDK. But why is it so challenging to _actually_ leverage Notion as a CMS (Content Management System) in production? 
 
-Until recently there wasn't support for sub-pages (sub-items in a database) in Notion. So most existing Notion-as-a-cms solutions don't provide a way to leverage this new feature, which turns out to be crucial for building a collection-based CMS. Another barrier is that pulling content from Notion can be time consuming. Responses can take a few seconds at times, the API provides a lot of data to sift through, and multiple calls to different endpoints is required in order to go from CMS database to the content for each page. All of this together results in a less than excellent developer experience when using a static site generator that often makes requests on each build.
+Until recently there wasn't support for sub-pages (sub-items in a database) in Notion. So most existing Notion-as-a-cms solutions don't provide a way to leverage this new feature, which turns out to be crucial for building a collection-based CMS. Another barrier is that pulling content from Notion can be time consuming. Responses can take a few seconds at times, the API provides a lot of data to sift through, and multiple calls to different endpoints are required in order to go from CMS database to the content for each page. All of this together results in a less than excellent developer experience when using a static site generator that often makes requests on each build.
 
 NotionCMS exists to address each of these issues and provide an excellent developer experience while using Notion as your Content Management System.
 
@@ -28,13 +28,10 @@ See the structure in this template https://cooked-shovel-3c3.notion.site/Communi
 - [x] route generation for SSG
 - [x] content caching
 - [x] tag grouping and filtering
-- [x] plugin system
+- [x] plugin system and core plugins
+- [x] arbitrary notion properties handling
 - [ ] optimized content caching
-- [ ] Aliasable component mapping (using notion callouts)
-- [ ] arbitrary notion properties handling
-- [ ] Layout definitions and ability to add custom layouts
 - [ ] custom paths
-- [ ] style linking/parsing from notion db
 
 ## Basic Usage
 
@@ -55,9 +52,6 @@ console.log(myCoolCMS.routes)
 
 // Access the page content here:
 console.log(myCoolCMS.data)
-
-// Get tagged collections this way or by passing a single tag:
-const tagged = myCoolCMS.getTaggedCollection(['blog', 'programming'])
 
 // Access paths like this:
 const postA = myCoolCMS.data['/posts']['/how-to-build-a-blog-with-notion']
@@ -101,13 +95,20 @@ See actual plugins for more in depth examples.
 ## Some Helper methods
 
 ```javascript
-
-myCMS.filterSubPages('/path-segment' /* or Page reference*/)
-
-// returns an array of only child pages of a page looked up using the key.
-
+// returns page reference
 myCMS.queryByPath('/full/path/to/page')
 
-// returns page reference
+// returns an array of only child pages of a page looked up using the key.
+// This runs queryByPath under the hood so you can save a step
+myCMS.filterSubPages('/full/path/to/page' /* or Page reference*/)
 
+// Get tagged collections this way or by passing a single tag:
+const tagged = myCoolCMS.getTaggedCollection(['blog', 'programming'])
+
+// walk the CMS from the root node and perform some operation for each node.
+// the node parameter will be of type PageContent so you have access to all of the page data
+myCoolCMS.walk(node => console.log(node))
+
+// for async callbacks
+await myCoolCMS.asyncWalk(async node => await asynchronousFunc())
 ```
