@@ -1,6 +1,6 @@
 {
   "name": "@agency-kit/notion-cms",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "turn notion into a content management system with this utility set.",
   "main": "./dist/index.js",
   "exports": {
