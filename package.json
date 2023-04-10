@@ -35,6 +35,7 @@
   },
   "homepage": "https://github.com/agency-kit/notion-cms#readme",
   "dependencies": {
+    "@changesets/cli": "^2.26.1",
     "@notion-stuff/blocks-html-parser": "^6.0.0",
     "@notion-stuff/blocks-markdown-parser": "^6.0.0",
     "@notionhq/client": "^2.2.3",

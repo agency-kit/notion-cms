@@ -483,8 +483,6 @@ export default class NotionCMS {
   }
 
   filterSubPages(pathOrPage: string | Page): Array<Page> {
-    // take path instead of path and if there are multiple pages with the same path
-    // throw an error saying you need to specify more path
     if (typeof pathOrPage === 'string' &&
       typeof this.cms.siteData !== 'string') {
       pathOrPage = this.queryByPath(pathOrPage) as Page
