@@ -1,6 +1,8 @@
 test/
 debug/
 src/
+coverage/
+.changeset/
 .env
 tsconfig.json
 rollup.config.js
