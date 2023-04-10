@@ -253,7 +253,7 @@ export default class NotionCMS {
     const pageContent = await this.limiter.schedule(
       async () => await this.notionClient.blocks.children.list({
         block_id: id,
-        page_size: 50,
+        page_size: 100, // This is the max. TODO: Handle more blocks using pagination API.
       })
     )
 
