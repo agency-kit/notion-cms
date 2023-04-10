@@ -2,6 +2,13 @@
 
 Turn Notion into a full-fledged Headless CMS with this utility set.
 
+🌲  Build a collection-based CMS tree from your Notion database.  
+🎚️  Leverage database sub-items.  
+⚙️   Geared for Static Site Generation.  
+🗃️  Content Caching for super fast builds.  
+🧩  Plugin ready with some powerful core plugins on the way.  
+🦾  Tagging, filtering, path queries, and tree-walking utilities.  
+
 ## Install
 
 ``` npm install @agency-kit/notion-cms ```
