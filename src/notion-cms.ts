@@ -290,6 +290,7 @@ export default class NotionCMS {
     await new AsyncWalkBuilder()
       .withCallback({
         nodeTypeFilters: ['object'],
+        positionFilter: 'postWalk',
         callback: async node => {
           if (!node.val?._notion) return
           const content = await this._pullPageContent(node.val._notion.id)
