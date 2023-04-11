@@ -302,6 +302,7 @@ export default class NotionCMS {
           _.assign(
             node.val,
             await this._runPlugins(node.val, 'during-tree') as Page)
+          delete node.val.otherProps
         }
       })
       .withRootObjectCallbacks(false)

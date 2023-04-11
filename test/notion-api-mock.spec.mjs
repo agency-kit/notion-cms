@@ -37,7 +37,6 @@ export const expectedSiteData = {
     slug: 'team',
     path: "/team",
     url: "",
-    otherProps: {},
     _ancestors: []
   },
   '/products': {
@@ -56,7 +55,6 @@ export const expectedSiteData = {
     slug: 'products',
     path: "/products",
     url: "",
-    otherProps: {},
     _ancestors: [],
     '/category': {
       name: 'Category',
@@ -78,7 +76,7 @@ export const expectedSiteData = {
       slug: 'category',
       path: "/products/category",
       url: "",
-      otherProps: {},
+
       _ancestors: [],
       '/product-a': {
         name: 'Product A',
@@ -96,7 +94,7 @@ export const expectedSiteData = {
         slug: 'product-a',
         path: "/products/category/product-a",
         url: "",
-        otherProps: {},
+
         _ancestors: []
       },
       '/product-b': {
@@ -121,7 +119,7 @@ export const expectedSiteData = {
         slug: 'product-b',
         path: "/products/category/product-b",
         url: "",
-        otherProps: {},
+
         _ancestors: []
       },
     },
@@ -157,7 +155,6 @@ export const expectedTaggedCollection = [
     slug: 'category',
     path: "/products/category",
     url: "",
-    otherProps: {},
     _ancestors: [],
     '/product-a': {
       name: 'Product A',
@@ -175,7 +172,7 @@ export const expectedTaggedCollection = [
       slug: 'product-a',
       path: "/products/category/product-a",
       url: "",
-      otherProps: {},
+
       _ancestors: []
     },
     '/product-b': {
@@ -200,7 +197,7 @@ export const expectedTaggedCollection = [
       slug: 'product-b',
       path: "/products/category/product-b",
       url: "",
-      otherProps: {},
+
       _ancestors: []
     },
   },
@@ -226,7 +223,6 @@ export const expectedTaggedCollection = [
     slug: 'product-b',
     path: "/products/category/product-b",
     url: "",
-    otherProps: {},
     _ancestors: []
   },
   {
@@ -245,7 +241,6 @@ export const expectedTaggedCollection = [
     slug: 'product-a',
     path: "/products/category/product-a",
     url: "",
-    otherProps: {},
     _ancestors: []
   },
 ]
