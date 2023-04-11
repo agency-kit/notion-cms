@@ -162,11 +162,13 @@ export default class NotionCMS {
     return Object.entries(this.cms.siteData)
   }
 
-  async _runPlugins(context: PluginPassthrough, hook: 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree')
+  async _runPlugins(
+    context: PluginPassthrough,
+    hook: 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree')
     : Promise<PluginPassthrough> {
     if (!this.plugins?.length) return context
     let val = context
-    for (const plugin of this.plugins) {
+    for (const plugin of this.plugins.flat()) {
       if (plugin.hook === hook) {
         // pass in previous plugin output
         val = await plugin.exec(val)
