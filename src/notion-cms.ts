@@ -118,8 +118,8 @@ export default class NotionCMS {
     rootUrl,
     limiter,
     plugins
-  }: Options = { databaseId: '', notionAPIKey: '', debug: false, rootUrl: '', draftMode: false }, previousState?: string) {
-    this.cms = previousState && this.import(previousState) || {
+  }: Options = { databaseId: '', notionAPIKey: '', debug: false, rootUrl: '', draftMode: false }) {
+    this.cms = {
       metadata: {
         databaseId,
         rootUrl: rootUrl || ''
@@ -164,7 +164,7 @@ export default class NotionCMS {
 
   async _runPlugins(
     context: PluginPassthrough,
-    hook: 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree')
+    hook: Plugin['hook'])
     : Promise<PluginPassthrough> {
     if (!this.plugins?.length) return context
     let val = context
@@ -414,7 +414,7 @@ export default class NotionCMS {
   async fetch(): Promise<CMS> {
     let cachedCMS
     if (fs.existsSync(this.localCacheUrl)) {
-      cachedCMS = this.import(fs.readFileSync(this.localCacheUrl, 'utf-8'))
+      cachedCMS = JSONParseWithFunctions(fs.readFileSync(this.localCacheUrl, 'utf-8')) as CMS
     }
     // Use refresh time to see if we should return local env cache or fresh api calls from Notion
     if (cachedCMS && cachedCMS.lastUpdateTimestamp &&
@@ -516,7 +516,9 @@ export default class NotionCMS {
     }
   }
 
-  import(previousState: string): CMS {
-    return JSONParseWithFunctions(previousState) as CMS
+  async import(previousState: string): Promise<CMS> {
+    const parsedPreviousState = JSONParseWithFunctions(previousState) as CMS
+    const transformedPreviousState = await this._runPlugins(parsedPreviousState, 'import') as CMS
+    return this.cms = transformedPreviousState
   }
 }

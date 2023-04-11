@@ -753,7 +753,7 @@ nock(baseUrl)
 nock(baseUrl)
   .persist()
   .get(`/blocks/${pageIds[0]}/children`)
-  .query({ page_size: 50 })
+  .query({ page_size: 100 })
   .reply(200, {
     "object": "list",
     "results": [
@@ -854,7 +854,7 @@ nock(baseUrl)
 nock(baseUrl)
   .persist()
   .get(`/blocks/${pageIds[1]}/children`)
-  .query({ page_size: 50 })
+  .query({ page_size: 100 })
   .reply(200, {
     "object": "list",
     "results": [
@@ -955,7 +955,7 @@ nock(baseUrl)
 nock(baseUrl)
   .persist()
   .get(`/blocks/${pageIds[2]}/children`)
-  .query({ page_size: 50 })
+  .query({ page_size: 100 })
   .reply(200, {
     "object": "list",
     "results": [
@@ -1056,7 +1056,7 @@ nock(baseUrl)
 nock(baseUrl)
   .persist()
   .get(`/blocks/${pageIds[3]}/children`)
-  .query({ page_size: 50 })
+  .query({ page_size: 100 })
   .reply(200, {
     "object": "list",
     "results": [
@@ -1157,7 +1157,7 @@ nock(baseUrl)
 nock(baseUrl)
   .persist()
   .get(`/blocks/${pageIds[4]}/children`)
-  .query({ page_size: 50 })
+  .query({ page_size: 100 })
   .reply(200, {
     "object": "list",
     "results": [

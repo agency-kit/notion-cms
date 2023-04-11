@@ -110,6 +110,6 @@ export type PluginPassthrough = Blocks | CMS | Page | string
 export interface Plugin {
   name: string,
   core: boolean,
-  hook: 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree'
+  hook: 'import' | 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree'
   exec: (context: PluginPassthrough) => PluginPassthrough
 }
