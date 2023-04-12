@@ -4,7 +4,13 @@ import { test } from 'uvu';
 import * as assert from 'uvu/assert';
 import { removeCircular } from './test-utils.mjs'
 
-import { expectedRoutes, expectedTags, expectedSiteData, expectedTaggedCollection } from './notion-api-mock.spec.mjs';
+import {
+  expectedRoutes,
+  expectedRejectedPageData,
+  expectedTags,
+  expectedSiteData,
+  expectedTaggedCollection
+} from './notion-api-mock.spec.mjs';
 
 const noMock = process.argv[2]
 
@@ -64,6 +70,30 @@ test('filter sub pages', () => {
   const productsInCategory = testCMS.filterSubPages(category)
   const names = productsInCategory.map(product => product.name)
   assert.equal(names, ['Product B', 'Product A'])
+
+  // Uncomment when fuzzy search is built
+  // const categoryB = testCMS.queryByPath('/category')
+  // const productsInCategoryB = testCMS.filterSubPages(categoryB)
+  // const namesB = productsInCategoryB.map(product => product.name)
+  // assert.equal(namesB, ['Product B', 'Product A'])
+})
+
+// reject sub pages
+test('reject sub pages', () => {
+  const category = testCMS.queryByPath('/products/category')
+  const categoryProps = testCMS.rejectSubPages(category)
+  assert.equal(categoryProps, expectedRejectedPageData)
+
+  // Uncomment when fuzzy search is built
+  // const categoryB = testCMS.queryByPath('/category')
+  // const categoryPropsB = testCMS.rejectSubPages(categoryB)
+  // assert.equal(categoryPropsB, expectedRejectedPageData)
+})
+
+test('walk from partial path', () => {
+  const test = []
+  testCMS.walk(node => test.push(node.name), '/products/category')
+  assert.equal(test, ['Product B', 'Product A'])
 })
 
 test.run();

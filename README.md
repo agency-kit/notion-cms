@@ -102,12 +102,16 @@ myCMS.queryByPath('/full/path/to/page')
 // This runs queryByPath under the hood so you can save a step
 myCMS.filterSubPages('/full/path/to/page' /* or Page reference*/)
 
+// returns page object without any children - just the content. Useful for serializing and sending a
+// single pages data to the client.
+myCoolCMS.rejectSubPages('/full/path/to/page' /* or Page reference*/)
+
 // Get tagged collections this way or by passing a single tag:
 const tagged = myCoolCMS.getTaggedCollection(['blog', 'programming'])
 
 // walk the CMS from the root node and perform some operation for each node.
 // the node parameter will be of type PageContent so you have access to all of the page data
-myCoolCMS.walk(node => console.log(node))
+myCoolCMS.walk(node => console.log(node), '/partial/path/to/start')
 
 // for async callbacks
 await myCoolCMS.asyncWalk(async node => await asynchronousFunc())

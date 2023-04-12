@@ -44,7 +44,6 @@ export type PageContent = {
   name?: string,
   path?: string,
   url?: string,
-  _ancestors: Page[],
   otherProps?: PageObjectResponse['properties'],
   _notion?: {
     parent?: PageContent,

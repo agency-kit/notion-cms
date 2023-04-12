@@ -208,6 +208,12 @@ export default class NotionCMS {
     return this._flatListToTree(list, 'id', 'pid', (node: FlatListItem) => !node.pid)
   }
 
+  _isPageContentObject(node: WalkNode): boolean {
+    return typeof node.key === 'string' && node?.key?.startsWith('/') &&
+      ((typeof node?.parent?.key === 'string' && node?.parent?.key?.startsWith('/')) ||
+        !node?.parent?.key)
+  }
+
   _isTopLevelDir(response: PageObjectResponse): boolean {
     const parentPage = response?.properties['parent-page'] as PageObjectRelation
     return _.isEmpty(parentPage.relation)
@@ -289,10 +295,10 @@ export default class NotionCMS {
 
     await new AsyncWalkBuilder()
       .withCallback({
+        filters: [(node: WalkNode) => this._isPageContentObject(node)],
         nodeTypeFilters: ['object'],
         positionFilter: 'postWalk',
-        callback: async node => {
-          if (!node.val?._notion) return
+        callback: async (node: WalkNode) => {
           const content = await this._pullPageContent(node.val._notion.id)
           const imageUrl = content.match(COVER_IMAGE_REGEX)?.[1]
           _.assign(node.val, {
@@ -304,6 +310,8 @@ export default class NotionCMS {
             node.val,
             await this._runPlugins(node.val, 'during-tree') as Page)
           delete node.val.otherProps
+          // We only want access to ancestors for plugins, otherwise it creates circular ref headaches.
+          delete node.val._ancestors
         }
       })
       .withRootObjectCallbacks(false)
@@ -342,7 +350,6 @@ export default class NotionCMS {
         {
           name,
           otherProps,
-          _ancestors: [],
           slug: name.slug,
           authors,
           tags,
@@ -442,34 +449,26 @@ export default class NotionCMS {
   }
 
   async asyncWalk(cb: Function, path?: string) {
-    // Path param not supported yet. This is because 'graph' mode process nodes outside the specified start point
-    // We need to do something about circular references to the ancestors to support walking in finiteTree mode.
-    // const startPoint = path ? this.queryByPath(path) : this.cms.siteData
-    const startPoint = this.cms.siteData
+    const startPoint = path ? this.queryByPath(path) : this.cms.siteData
     await new AsyncWalkBuilder()
       .withCallback({
         nodeTypeFilters: ['object'],
-        filters: [(node: WalkNode) => typeof node.key === 'string' && node?.key?.startsWith('/')],
+        filters: [(node: WalkNode) => this._isPageContentObject(node)],
         callback: (node: WalkNode) => cb(node.val) as AsyncCallbackFn
       })
-      .withGraphMode('graph')
       .withRootObjectCallbacks(false)
       .withParallelizeAsyncCallbacks(true)
       .walk(startPoint)
   }
 
   walk(cb: Function, path?: string) {
-    // Path param not supported yet. This is because 'graph' mode process nodes outside the specified start point
-    // We need to do something about circular references to the ancestors to support walking in finiteTree mode.
-    // const startPoint = path ? this.queryByPath(path) : this.cms.siteData
-    const startPoint = this.cms.siteData
+    const startPoint = path ? this.queryByPath(path) : this.cms.siteData
     new WalkBuilder()
       .withCallback({
         nodeTypeFilters: ['object'],
-        filters: [(node: WalkNode) => typeof node.key === 'string' && node?.key?.startsWith('/')],
+        filters: [(node: WalkNode) => this._isPageContentObject(node)],
         callback: (node: WalkNode) => cb(node.val)
       })
-      .withGraphMode('graph')
       .withRootObjectCallbacks(false)
       .walk(startPoint)
   }
@@ -487,13 +486,23 @@ export default class NotionCMS {
   }
 
   filterSubPages(pathOrPage: string | Page): Array<Page> {
-    if (typeof pathOrPage === 'string' &&
-      typeof this.cms.siteData !== 'string') {
+    if (typeof pathOrPage === 'string') {
       pathOrPage = this.queryByPath(pathOrPage) as Page
     }
-    return Object.entries(pathOrPage)
+    return _(pathOrPage)
+      .entries()
       .filter(([key]) => key.startsWith('/'))
-      .map(e => e[1]) as Page[]
+      .map(e => e[1]).value() as Page[]
+  }
+
+  rejectSubPages(pathOrPage: string | Page): Page {
+    if (typeof pathOrPage === 'string') {
+      pathOrPage = this.queryByPath(pathOrPage) as Page
+    }
+    return _(pathOrPage)
+      .entries()
+      .reject(([key]) => key.startsWith('/'))
+      .fromPairs().value() as Page
   }
 
   queryByPath(path: string): Page {
