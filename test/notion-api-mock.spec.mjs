@@ -36,9 +36,7 @@ export const expectedSiteData = {
     coverImage: undefined,
     slug: 'team',
     path: "/team",
-    url: "",
-    otherProps: {},
-    _ancestors: []
+    url: ""
   },
   '/products': {
     name: 'Products',
@@ -56,8 +54,6 @@ export const expectedSiteData = {
     slug: 'products',
     path: "/products",
     url: "",
-    otherProps: {},
-    _ancestors: [],
     '/category': {
       name: 'Category',
       _key: '/category',
@@ -78,8 +74,6 @@ export const expectedSiteData = {
       slug: 'category',
       path: "/products/category",
       url: "",
-      otherProps: {},
-      _ancestors: [],
       '/product-a': {
         name: 'Product A',
         _key: '/product-a',
@@ -95,9 +89,7 @@ export const expectedSiteData = {
         coverImage: undefined,
         slug: 'product-a',
         path: "/products/category/product-a",
-        url: "",
-        otherProps: {},
-        _ancestors: []
+        url: ""
       },
       '/product-b': {
         name: 'Product B',
@@ -120,9 +112,7 @@ export const expectedSiteData = {
         coverImage: undefined,
         slug: 'product-b',
         path: "/products/category/product-b",
-        url: "",
-        otherProps: {},
-        _ancestors: []
+        url: ""
       },
     },
   },
@@ -157,8 +147,6 @@ export const expectedTaggedCollection = [
     slug: 'category',
     path: "/products/category",
     url: "",
-    otherProps: {},
-    _ancestors: [],
     '/product-a': {
       name: 'Product A',
       _key: '/product-a',
@@ -174,9 +162,7 @@ export const expectedTaggedCollection = [
       coverImage: undefined,
       slug: 'product-a',
       path: "/products/category/product-a",
-      url: "",
-      otherProps: {},
-      _ancestors: []
+      url: ""
     },
     '/product-b': {
       name: 'Product B',
@@ -199,9 +185,7 @@ export const expectedTaggedCollection = [
       coverImage: undefined,
       slug: 'product-b',
       path: "/products/category/product-b",
-      url: "",
-      otherProps: {},
-      _ancestors: []
+      url: ""
     },
   },
   {
@@ -225,9 +209,7 @@ export const expectedTaggedCollection = [
     coverImage: undefined,
     slug: 'product-b',
     path: "/products/category/product-b",
-    url: "",
-    otherProps: {},
-    _ancestors: []
+    url: ""
   },
   {
     name: 'Product A',
@@ -244,11 +226,31 @@ export const expectedTaggedCollection = [
     coverImage: undefined,
     slug: 'product-a',
     path: "/products/category/product-a",
-    url: "",
-    otherProps: {},
-    _ancestors: []
+    url: ""
   },
 ]
+
+export const expectedRejectedPageData = {
+  name: 'Category',
+  _key: '/category',
+  id: 'b194a437-262e-482c-92b2-c5581eb5b477',
+  pid: 'dd5157a6-cf4c-4a51-8da5-0da83ef641ae',
+  authors: [],
+  tags: [
+    "blog",
+    "notion",
+    "apis"
+  ],
+  _notion: {
+    id: "b194a437-262e-482c-92b2-c5581eb5b477",
+    last_edited_time: "2023-04-09T06:03:00.000Z"
+  },
+  content: '<h2 id=\"product-categories\">Product Categories</h2>\n<p>about product categories</p>\n',
+  coverImage: undefined,
+  slug: 'category',
+  path: "/products/category",
+  url: ""
+}
 
 
 nock(baseUrl)
@@ -753,7 +755,7 @@ nock(baseUrl)
 nock(baseUrl)
   .persist()
   .get(`/blocks/${pageIds[0]}/children`)
-  .query({ page_size: 50 })
+  .query({ page_size: 100 })
   .reply(200, {
     "object": "list",
     "results": [
@@ -854,7 +856,7 @@ nock(baseUrl)
 nock(baseUrl)
   .persist()
   .get(`/blocks/${pageIds[1]}/children`)
-  .query({ page_size: 50 })
+  .query({ page_size: 100 })
   .reply(200, {
     "object": "list",
     "results": [
@@ -955,7 +957,7 @@ nock(baseUrl)
 nock(baseUrl)
   .persist()
   .get(`/blocks/${pageIds[2]}/children`)
-  .query({ page_size: 50 })
+  .query({ page_size: 100 })
   .reply(200, {
     "object": "list",
     "results": [
@@ -1056,7 +1058,7 @@ nock(baseUrl)
 nock(baseUrl)
   .persist()
   .get(`/blocks/${pageIds[3]}/children`)
-  .query({ page_size: 50 })
+  .query({ page_size: 100 })
   .reply(200, {
     "object": "list",
     "results": [
@@ -1157,7 +1159,7 @@ nock(baseUrl)
 nock(baseUrl)
   .persist()
   .get(`/blocks/${pageIds[4]}/children`)
-  .query({ page_size: 50 })
+  .query({ page_size: 100 })
   .reply(200, {
     "object": "list",
     "results": [

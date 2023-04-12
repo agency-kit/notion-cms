@@ -1,5 +1,21 @@
 # @agency-kit/notion-cms
 
+## 0.3.0
+
+### Minor Changes
+
+- 9157243: Fix: ensure that tree walkers only operate on page content nodes.
+  Upd: Remove ancestor nodes from public API.
+  Upd: Add support for starting a walk/async walk from a partial path.
+  New: Add helper method to capture only page data and remove that pages children. Useful for sending individual page data to client without sending its sub tree.
+- 8ae6713: New: Add import plugin hook and remove previous state importing in constructor. Now you have to manually import anytime you want to revive a CMS.
+
+### Patch Changes
+
+- 84433cb: Upd: remove otherProps to keep from polluting final tree structure. Guide users down the path of building plugins to extract props at an earlier stage.
+- 8ae6713: New: add support for a plugin function returning an array with multiple plugin hook executors.
+- 41015e2: Fix: increase page size to maximum number of blocks when pulling page content.
+
 ## 0.2.0
 
 ### Minor Changes

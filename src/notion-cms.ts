@@ -118,8 +118,8 @@ export default class NotionCMS {
     rootUrl,
     limiter,
     plugins
-  }: Options = { databaseId: '', notionAPIKey: '', debug: false, rootUrl: '', draftMode: false }, previousState?: string) {
-    this.cms = previousState && this.import(previousState) || {
+  }: Options = { databaseId: '', notionAPIKey: '', debug: false, rootUrl: '', draftMode: false }) {
+    this.cms = {
       metadata: {
         databaseId,
         rootUrl: rootUrl || ''
@@ -162,11 +162,13 @@ export default class NotionCMS {
     return Object.entries(this.cms.siteData)
   }
 
-  async _runPlugins(context: PluginPassthrough, hook: 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree')
+  async _runPlugins(
+    context: PluginPassthrough,
+    hook: Plugin['hook'])
     : Promise<PluginPassthrough> {
     if (!this.plugins?.length) return context
     let val = context
-    for (const plugin of this.plugins) {
+    for (const plugin of this.plugins.flat()) {
       if (plugin.hook === hook) {
         // pass in previous plugin output
         val = await plugin.exec(val)
@@ -204,6 +206,12 @@ export default class NotionCMS {
 
   _notionListToTree(list: FlatList): Record<string, Page> {
     return this._flatListToTree(list, 'id', 'pid', (node: FlatListItem) => !node.pid)
+  }
+
+  _isPageContentObject(node: WalkNode): boolean {
+    return typeof node.key === 'string' && node?.key?.startsWith('/') &&
+      ((typeof node?.parent?.key === 'string' && node?.parent?.key?.startsWith('/')) ||
+        !node?.parent?.key)
   }
 
   _isTopLevelDir(response: PageObjectResponse): boolean {
@@ -253,7 +261,7 @@ export default class NotionCMS {
     const pageContent = await this.limiter.schedule(
       async () => await this.notionClient.blocks.children.list({
         block_id: id,
-        page_size: 50,
+        page_size: 100, // This is the max. TODO: Handle more blocks using pagination API.
       })
     )
 
@@ -287,9 +295,10 @@ export default class NotionCMS {
 
     await new AsyncWalkBuilder()
       .withCallback({
+        filters: [(node: WalkNode) => this._isPageContentObject(node)],
         nodeTypeFilters: ['object'],
-        callback: async node => {
-          if (!node.val?._notion) return
+        positionFilter: 'postWalk',
+        callback: async (node: WalkNode) => {
           const content = await this._pullPageContent(node.val._notion.id)
           const imageUrl = content.match(COVER_IMAGE_REGEX)?.[1]
           _.assign(node.val, {
@@ -300,6 +309,9 @@ export default class NotionCMS {
           _.assign(
             node.val,
             await this._runPlugins(node.val, 'during-tree') as Page)
+          delete node.val.otherProps
+          // We only want access to ancestors for plugins, otherwise it creates circular ref headaches.
+          delete node.val._ancestors
         }
       })
       .withRootObjectCallbacks(false)
@@ -338,7 +350,6 @@ export default class NotionCMS {
         {
           name,
           otherProps,
-          _ancestors: [],
           slug: name.slug,
           authors,
           tags,
@@ -412,7 +423,7 @@ export default class NotionCMS {
   async fetch(): Promise<CMS> {
     let cachedCMS
     if (fs.existsSync(this.localCacheUrl)) {
-      cachedCMS = this.import(fs.readFileSync(this.localCacheUrl, 'utf-8'))
+      cachedCMS = JSONParseWithFunctions(fs.readFileSync(this.localCacheUrl, 'utf-8')) as CMS
     }
     // Use refresh time to see if we should return local env cache or fresh api calls from Notion
     if (cachedCMS && cachedCMS.lastUpdateTimestamp &&
@@ -438,34 +449,26 @@ export default class NotionCMS {
   }
 
   async asyncWalk(cb: Function, path?: string) {
-    // Path param not supported yet. This is because 'graph' mode process nodes outside the specified start point
-    // We need to do something about circular references to the ancestors to support walking in finiteTree mode.
-    // const startPoint = path ? this.queryByPath(path) : this.cms.siteData
-    const startPoint = this.cms.siteData
+    const startPoint = path ? this.queryByPath(path) : this.cms.siteData
     await new AsyncWalkBuilder()
       .withCallback({
         nodeTypeFilters: ['object'],
-        filters: [(node: WalkNode) => typeof node.key === 'string' && node?.key?.startsWith('/')],
+        filters: [(node: WalkNode) => this._isPageContentObject(node)],
         callback: (node: WalkNode) => cb(node.val) as AsyncCallbackFn
       })
-      .withGraphMode('graph')
       .withRootObjectCallbacks(false)
       .withParallelizeAsyncCallbacks(true)
       .walk(startPoint)
   }
 
   walk(cb: Function, path?: string) {
-    // Path param not supported yet. This is because 'graph' mode process nodes outside the specified start point
-    // We need to do something about circular references to the ancestors to support walking in finiteTree mode.
-    // const startPoint = path ? this.queryByPath(path) : this.cms.siteData
-    const startPoint = this.cms.siteData
+    const startPoint = path ? this.queryByPath(path) : this.cms.siteData
     new WalkBuilder()
       .withCallback({
         nodeTypeFilters: ['object'],
-        filters: [(node: WalkNode) => typeof node.key === 'string' && node?.key?.startsWith('/')],
+        filters: [(node: WalkNode) => this._isPageContentObject(node)],
         callback: (node: WalkNode) => cb(node.val)
       })
-      .withGraphMode('graph')
       .withRootObjectCallbacks(false)
       .walk(startPoint)
   }
@@ -483,13 +486,23 @@ export default class NotionCMS {
   }
 
   filterSubPages(pathOrPage: string | Page): Array<Page> {
-    if (typeof pathOrPage === 'string' &&
-      typeof this.cms.siteData !== 'string') {
+    if (typeof pathOrPage === 'string') {
       pathOrPage = this.queryByPath(pathOrPage) as Page
     }
-    return Object.entries(pathOrPage)
+    return _(pathOrPage)
+      .entries()
       .filter(([key]) => key.startsWith('/'))
-      .map(e => e[1]) as Page[]
+      .map(e => e[1]).value() as Page[]
+  }
+
+  rejectSubPages(pathOrPage: string | Page): Page {
+    if (typeof pathOrPage === 'string') {
+      pathOrPage = this.queryByPath(pathOrPage) as Page
+    }
+    return _(pathOrPage)
+      .entries()
+      .reject(([key]) => key.startsWith('/'))
+      .fromPairs().value() as Page
   }
 
   queryByPath(path: string): Page {
@@ -514,7 +527,9 @@ export default class NotionCMS {
     }
   }
 
-  import(previousState: string): CMS {
-    return JSONParseWithFunctions(previousState) as CMS
+  async import(previousState: string): Promise<CMS> {
+    const parsedPreviousState = JSONParseWithFunctions(previousState) as CMS
+    const transformedPreviousState = await this._runPlugins(parsedPreviousState, 'import') as CMS
+    return this.cms = transformedPreviousState
   }
 }
