@@ -8,6 +8,7 @@ Turn Notion into a full-fledged Headless CMS with this utility set.
 🗃️  Content Caching for super fast builds.  
 🧩  Plugin ready with some powerful core plugins on the way.  
 🦾  Tagging, filtering, path queries, and tree-walking utilities.  
+⌨️   Totally Typesafe.
 
 ## Install
 
