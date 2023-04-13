@@ -12,7 +12,7 @@ Turn Notion into a full-fledged Headless CMS with this utility set.
 ## Install
 
 ``` npm install @agency-kit/notion-cms ```   
-```pnpm install @agency-kit/notion-cms```  
+```pnpm add @agency-kit/notion-cms```  
 ```yarn add @agency-kit/notion-cms```  
 
 ## Why.
