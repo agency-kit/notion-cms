@@ -39,6 +39,7 @@
     "@notion-stuff/blocks-html-parser": "^6.0.0",
     "@notion-stuff/blocks-markdown-parser": "^6.0.0",
     "@notionhq/client": "^2.2.3",
+    "@tryfabric/martian": "^1.2.4",
     "flatted": "^3.2.7",
     "highlight.js": "^11.7.0",
     "lodash": "^4.17.21",

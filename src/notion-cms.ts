@@ -1,7 +1,7 @@
 import { Client, isFullPage } from "@notionhq/client"
 import {
   PageObjectResponse,
-  SelectPropertyItemObjectResponse
+  SelectPropertyItemObjectResponse, CreatePageParameters, UserObjectResponse
 } from '@notionhq/client/build/src/api-endpoints'
 import { NotionBlocksHtmlParser } from '@notion-stuff/blocks-html-parser'
 import { Blocks } from '@notion-stuff/v4-types'
@@ -25,6 +25,7 @@ import { fileURLToPath } from 'url';
 import { AsyncCallbackFn, AsyncWalkBuilder, WalkBuilder, WalkNode } from 'walkjs'
 import { default as serializeJS } from 'serialize-javascript'
 import { parse, stringify } from 'flatted';
+import NotionPage from "./notion-page"
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -98,6 +99,7 @@ export default class NotionCMS {
   cms: CMS
   cmsId: string
   notionClient: Client
+  pull: Function
   parser: NotionBlocksHtmlParser
   refreshTimeout: number
   draftMode: boolean
@@ -134,6 +136,7 @@ export default class NotionCMS {
     this.notionClient = new Client({
       auth: notionAPIKey
     })
+    this.pull = this.fetch // symmetry with `pull` without breaking current API
     this.parser = NotionBlocksHtmlParser.getInstance()
     this.refreshTimeout = refreshTimeout || 0
     this.draftMode = draftMode || false
@@ -244,6 +247,12 @@ export default class NotionCMS {
       if (!_.includes(cms.tags, tag)) cms.tags.push(tag)
       this._assignTagGroup(tag, path, cms)
     })
+  }
+
+  async _userLookup(name: string): Promise<string> {
+    const usersList = await this.notionClient.users.list({})
+    const theUser = _.filter(usersList.results, user => user.name === name)[0] as UserObjectResponse
+    return theUser.id
   }
 
   _getCoverImage(page: PageObjectResponse): string | undefined {
@@ -446,6 +455,41 @@ export default class NotionCMS {
     void this.routes
     if (this.debug) writeFile('debug/site-data.json', JSONStringifyWithFunctions(this.cms))
     return this.cms
+  }
+
+  _createParentProperty(): { parent: { type: string, database_id: string } } {
+    return {
+      parent: {
+        type: "database_id",
+        database_id: this.cms.metadata.databaseId
+      },
+    }
+  }
+
+  async push(): Promise<boolean> {
+    new AsyncWalkBuilder()
+      .withCallback({
+        callback: async (node: WalkNode) => {
+          const page = new NotionPage()
+            .addParentDb({ id: this.cms.metadata.databaseId })
+            .addParentPage({ id: node.val.pid })
+            .addProps([
+              { propName: 'authors', type: 'people', value: _.map(node.val.authors, this._userLookup) },
+              { propName: 'tags', type: 'multiselect', value: [...node.val.tags] },
+              { propName: 'title', value: node.val.title }
+            ])
+            .addContent(node.val.content)
+          try {
+            // Create if there, update if exists
+            await this.notionClient.pages.create(page as CreatePageParameters)
+          } catch (e) {
+            throw new Error(page.name + ':' + e)
+          }
+        }
+      })
+      .withParallelizeAsyncCallbacks(true)
+      .walk(this.cms.siteData)
+    return true
   }
 
   async asyncWalk(cb: Function, path?: string) {
