@@ -211,7 +211,22 @@ export default class NotionCMS {
     return this._flatListToTree(list, 'id', 'pid', (node: FlatListItem) => !node.pid)
   }
 
-  _isPageContentObject(node: WalkNode): boolean {
+  static _parseNotionEntityLink(url: string): string {
+    const linkRegex = /notion\.so\/(\S{32})/i
+    // Credit https://github.com/iamolegga/to-uuid/tree/master for this approach
+    const match = url.match(linkRegex)
+    let array = match?.[1].split('');
+    if (array) {
+      let offset = 0;
+      for (const num of [8, 12, 16, 20]) {
+        const position = num + offset++;
+        array = [...array.slice(0, position), '-', ...array.slice(position)]
+      }
+    }
+    return array?.join('') || ''
+  }
+
+  static _isPageContentObject(node: WalkNode): boolean {
     return typeof node.key === 'string' && node?.key?.startsWith('/') &&
       ((typeof node?.parent?.key === 'string' && node?.parent?.key?.startsWith('/')) ||
         !node?.parent?.key)
@@ -304,7 +319,7 @@ export default class NotionCMS {
 
     await new AsyncWalkBuilder()
       .withCallback({
-        filters: [(node: WalkNode) => this._isPageContentObject(node)],
+        filters: [(node: WalkNode) => NotionCMS._isPageContentObject(node)],
         nodeTypeFilters: ['object'],
         positionFilter: 'postWalk',
         callback: async (node: WalkNode) => {
@@ -457,15 +472,6 @@ export default class NotionCMS {
     return this.cms
   }
 
-  _createParentProperty(): { parent: { type: string, database_id: string } } {
-    return {
-      parent: {
-        type: "database_id",
-        database_id: this.cms.metadata.databaseId
-      },
-    }
-  }
-
   async push(): Promise<boolean> {
     new AsyncWalkBuilder()
       .withCallback({
@@ -497,7 +503,7 @@ export default class NotionCMS {
     await new AsyncWalkBuilder()
       .withCallback({
         nodeTypeFilters: ['object'],
-        filters: [(node: WalkNode) => this._isPageContentObject(node)],
+        filters: [(node: WalkNode) => NotionCMS._isPageContentObject(node)],
         callback: (node: WalkNode) => cb(node.val) as AsyncCallbackFn
       })
       .withRootObjectCallbacks(false)
@@ -510,7 +516,7 @@ export default class NotionCMS {
     new WalkBuilder()
       .withCallback({
         nodeTypeFilters: ['object'],
-        filters: [(node: WalkNode) => this._isPageContentObject(node)],
+        filters: [(node: WalkNode) => NotionCMS._isPageContentObject(node)],
         callback: (node: WalkNode) => cb(node.val)
       })
       .withRootObjectCallbacks(false)

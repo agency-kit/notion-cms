@@ -1,4 +1,4 @@
-import { AppendBlockChildrenParameters, MultiSelectPropertyItemObjectResponse, RichTextItemResponse, UserObjectResponse } from "@notionhq/client/build/src/api-endpoints"
+import { AppendBlockChildrenParameters } from "@notionhq/client/build/src/api-endpoints"
 import { markdownToBlocks } from '@tryfabric/martian';
 
 export default class NotionPage {
@@ -20,8 +20,8 @@ export default class NotionPage {
     return this.properties?.['Name'] || 'Page'
   }
 
+  // Does this properly render the nested items?
   addParentPage(page: ParentOrDatabaseId): NotionPage {
-    if (this.parent?.database_id) throw new Error('A parent has already been defined for this page.')
     this.properties['parent-page'] = {
       type: "relation",
       "relation": [{ "id": page.id }
