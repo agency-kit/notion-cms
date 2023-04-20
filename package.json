@@ -15,7 +15,7 @@
     "test:no-mock": "node test/notion-cms.spec.js true",
     "build": "rm -rf dist && tsc --project ./tsconfig.json && rollup -c && npm run dts",
     "dts": "dts-bundle-generator -o index.d.ts src/index.ts --no-check && rm -rf .tmp",
-    "test": "NODE_OPTIONS=--enable-source-maps npx c8 uvu test",
+    "test": "NODE_OPTIONS='--enable-source-maps' npx c8 uvu test",
     "build:test": "npm run build && npm run test"
   },
   "repository": {

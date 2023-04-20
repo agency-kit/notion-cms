@@ -15,6 +15,7 @@ import type {
   PageObjectUser,
   PageMultiSelect,
   Plugin,
+  UnsafePlugin,
   PluginPassthrough,
   PageContent,
 } from "./types"
@@ -25,6 +26,7 @@ import { fileURLToPath } from 'url';
 import { AsyncCallbackFn, AsyncWalkBuilder, WalkBuilder, WalkNode } from 'walkjs'
 import { default as serializeJS } from 'serialize-javascript'
 import { parse, stringify } from 'flatted';
+import render from "./plugins/render"
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -106,19 +108,19 @@ export default class NotionCMS {
   localCacheUrl: string
   debug: boolean | undefined
   limiter: { schedule: Function }
-  plugins: Array<Plugin> | undefined
+  plugins: Array<Plugin | UnsafePlugin> | undefined
 
   constructor({
     databaseId,
     notionAPIKey,
-    debug,
-    draftMode,
-    refreshTimeout,
-    localCacheDirectory,
-    rootUrl,
-    limiter,
-    plugins
-  }: Options = { databaseId: '', notionAPIKey: '', debug: false, rootUrl: '', draftMode: false }) {
+    debug = false,
+    draftMode = false,
+    refreshTimeout = 0,
+    localCacheDirectory = './.notion-cms/',
+    rootUrl = '',
+    limiter = { schedule: (func: Function) => { const result = func(); return Promise.resolve(result) } },
+    plugins = [render({ blockRenderers: {} })]
+  }: Options = { databaseId: '', notionAPIKey: '' }) {
     this.cms = {
       metadata: {
         databaseId,
@@ -137,11 +139,11 @@ export default class NotionCMS {
     this.parser = NotionBlocksHtmlParser.getInstance()
     this.refreshTimeout = refreshTimeout || 0
     this.draftMode = draftMode || false
-    this.localCacheDirectory = localCacheDirectory || './.notion-cms/'
+    this.localCacheDirectory = localCacheDirectory
     this.defaultCacheFilename = `cache.json`
     this.localCacheUrl = path.resolve(__dirname, this.localCacheDirectory + this.defaultCacheFilename)
     this.debug = debug
-    this.limiter = limiter || { schedule: (func: Function) => { const result = func(); return Promise.resolve(result) } }
+    this.limiter = limiter
     this.plugins = plugins
     this.limiter.schedule.bind(limiter)
   }
@@ -162,11 +164,18 @@ export default class NotionCMS {
     return Object.entries(this.cms.siteData)
   }
 
+  _checkDuplicateParsePlugins(pluginsList: Array<Plugin | UnsafePlugin>): boolean {
+    return _(pluginsList).filter(plugin => plugin.hook === 'parse').uniq().value().length > 1
+  }
+
   async _runPlugins(
     context: PluginPassthrough,
-    hook: Plugin['hook'])
+    hook: Plugin['hook'] | 'parse')
     : Promise<PluginPassthrough> {
     if (!this.plugins?.length) return context
+    if (this._checkDuplicateParsePlugins(this.plugins)) {
+      throw new Error('Only one parse-capable plugin must be used. Use the default NotionCMS render plugin.')
+    }
     let val = context
     for (const plugin of this.plugins.flat()) {
       if (plugin.hook === hook) {
@@ -266,7 +275,7 @@ export default class NotionCMS {
     )
 
     const results = await this._runPlugins(pageContent.results, 'pre-parse')
-    const parsedBlocks = this.parser.parse(results as Blocks)
+    const parsedBlocks = await this._runPlugins(results as Blocks, 'parse')
     const html = await this._runPlugins(parsedBlocks, 'post-parse') as string
     return html
   }
@@ -378,7 +387,6 @@ export default class NotionCMS {
     const db = await this.limiter.schedule(
       async () => await this.notionClient.databases.query({ database_id: state.metadata.databaseId })
     )
-
     stateWithDb.siteData = this._notionListToTree(
       _(db.results)
         .filter(this._publishedFilter)
@@ -391,21 +399,22 @@ export default class NotionCMS {
         .value()
     )
 
+    if (_.isEmpty(stateWithDb.siteData)) {
+      throw new Error('NotionCMS is empty. Did you mean to set `draftMode: true`?')
+    }
+
     new WalkBuilder()
       .withCallback({
         nodeTypeFilters: ['object'],
         callback: (node: WalkNode) => {
           if (!node.val?._notion) return
-          // Main Content
           const [route, update] = this._getPageUpdate(node.val._notion as PageObjectResponse)
           _.assign(node.val, update)
-          // set ancestors in node
           _.assign(node.val, {
             path: node.getPath(node => `${node.key}`).replace('siteData', ''),
             url: stateWithDb.metadata.rootUrl && path ?
               stateWithDb.metadata.rootUrl as string + path : ''
           })
-          // Tag Groups
           if (node.key && typeof node.key === 'string') {
             this._buildTagGroups(node.val.tags, node.val.path, stateWithDb)
           }

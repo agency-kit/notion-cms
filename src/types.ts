@@ -24,7 +24,7 @@ export interface Options {
   localCacheDirectory?: string
   rootUrl?: string | URL | undefined // Used to generate full path links,
   limiter?: { schedule: Function },
-  plugins?: Array<Plugin>
+  plugins?: Array<Plugin | UnsafePlugin>
 }
 
 export interface CMS {
@@ -108,7 +108,13 @@ export type PluginPassthrough = Blocks | CMS | Page | string
 
 export interface Plugin {
   name: string,
-  core: boolean,
   hook: 'import' | 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree'
+  exec: (context: PluginPassthrough) => PluginPassthrough
+}
+
+export interface UnsafePlugin {
+  name: string,
+  core: boolean,
+  hook: 'parse' | 'import' | 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree'
   exec: (context: PluginPassthrough) => PluginPassthrough
 }
