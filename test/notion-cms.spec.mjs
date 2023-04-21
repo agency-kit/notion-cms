@@ -12,12 +12,6 @@ import {
   expectedTaggedCollection
 } from './notion-api-mock.spec.mjs';
 
-const noMock = process.argv[2]
-
-if (!noMock) {
-  await import('./notion-api-mock.spec.mjs')
-}
-
 dotenv.config()
 
 const testCMS = new NotionCMS({

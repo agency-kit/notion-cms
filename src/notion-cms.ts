@@ -3,7 +3,6 @@ import {
   PageObjectResponse,
   SelectPropertyItemObjectResponse
 } from '@notionhq/client/build/src/api-endpoints'
-import { NotionBlocksHtmlParser } from '@notion-stuff/blocks-html-parser'
 import { Blocks } from '@notion-stuff/v4-types'
 import type {
   Cover,
@@ -100,7 +99,6 @@ export default class NotionCMS {
   cms: CMS
   cmsId: string
   notionClient: Client
-  parser: NotionBlocksHtmlParser
   refreshTimeout: number
   draftMode: boolean
   defaultCacheFilename: string
@@ -119,7 +117,7 @@ export default class NotionCMS {
     localCacheDirectory = './.notion-cms/',
     rootUrl = '',
     limiter = { schedule: (func: Function) => { const result = func(); return Promise.resolve(result) } },
-    plugins = [render({ blockRenderers: {} })]
+    plugins = []
   }: Options = { databaseId: '', notionAPIKey: '' }) {
     this.cms = {
       metadata: {
@@ -136,7 +134,6 @@ export default class NotionCMS {
     this.notionClient = new Client({
       auth: notionAPIKey
     })
-    this.parser = NotionBlocksHtmlParser.getInstance()
     this.refreshTimeout = refreshTimeout || 0
     this.draftMode = draftMode || false
     this.localCacheDirectory = localCacheDirectory
@@ -144,7 +141,7 @@ export default class NotionCMS {
     this.localCacheUrl = path.resolve(__dirname, this.localCacheDirectory + this.defaultCacheFilename)
     this.debug = debug
     this.limiter = limiter
-    this.plugins = plugins
+    this.plugins = this._dedupePlugins([...plugins, render({ blockRenderers: {} })])
     this.limiter.schedule.bind(limiter)
   }
 
@@ -162,6 +159,15 @@ export default class NotionCMS {
   get toplevelDirectories() {
     if (_.isEmpty(this.cms.siteData)) return
     return Object.entries(this.cms.siteData)
+  }
+
+  _dedupePlugins(plugins: Array<Plugin | UnsafePlugin>): Array<Plugin | UnsafePlugin> {
+    // @ts-ignore
+    const numParsePlugins = _.filter(plugins, { 'hook': 'parse' })
+    if (numParsePlugins.length > 1) {
+      return _.initial(plugins)
+    }
+    return plugins
   }
 
   _checkDuplicateParsePlugins(pluginsList: Array<Plugin | UnsafePlugin>): boolean {
