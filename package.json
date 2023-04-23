@@ -15,7 +15,7 @@
     "test:no-mock": "node test/notion-cms.spec.js true",
     "build": "rm -rf dist && tsc --project ./tsconfig.json && rollup -c && npm run dts",
     "dts": "dts-bundle-generator -o index.d.ts src/index.ts --no-check && rm -rf .tmp",
-    "test": "NODE_OPTIONS=--enable-source-maps npx c8 uvu test",
+    "test": "NODE_OPTIONS='--enable-source-maps' npx c8 uvu test",
     "build:test": "npm run build && npm run test"
   },
   "repository": {
@@ -39,13 +39,15 @@
     "@notion-stuff/blocks-html-parser": "^6.0.0",
     "@notion-stuff/blocks-markdown-parser": "^6.0.0",
     "@notionhq/client": "^2.2.3",
+    "@types/marked": "^4.0.8",
     "flatted": "^3.2.7",
     "highlight.js": "^11.7.0",
     "lodash": "^4.17.21",
     "marked": "^4.2.12",
     "serialize-javascript": "^6.0.1",
     "tslib": "^2.5.0",
-    "walkjs": "^4.0.5"
+    "walkjs": "^4.0.5",
+    "zod": "^3.21.4"
   },
   "devDependencies": {
     "@notion-stuff/v4-types": "^6.0.0",
