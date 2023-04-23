@@ -300,10 +300,9 @@ export default class NotionCMS {
         positionFilter: 'postWalk',
         callback: async (node: WalkNode) => {
           const content = await this._pullPageContent(node.val._notion.id)
-          const imageUrl = content.match(COVER_IMAGE_REGEX)?.[1]
           _.assign(node.val, {
             content,
-            coverImage: imageUrl,
+            ...(!node.val.coverImage && { coverImage: content.match(COVER_IMAGE_REGEX)?.[1] }),
             _ancestors: this._gatherNodeAncestors(node)
           })
           _.assign(
