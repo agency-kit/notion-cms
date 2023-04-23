@@ -118,3 +118,10 @@ export interface UnsafePlugin {
   hook: 'parse' | 'import' | 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree'
   exec: (context: PluginPassthrough) => PluginPassthrough
 }
+
+export interface FlatListItem {
+  _key: string,
+  [pid: string]: string
+}
+
+export type FlatList = FlatListItem[]

@@ -3,23 +3,20 @@ import NotionCMS from '../dist/index.mjs'
 import dotenv from 'dotenv'
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';
-import { removeCircular } from "./test-utils.mjs";
+import { setTimeout } from 'timers/promises';
 
 import {
   expectedRoutes,
   expectedRejectedPageData,
   expectedSiteData,
   expectedTaggedCollection,
-  expectedTags
+  expectedTags,
+  expectedTagGroups
 } from './notion-api-mock.spec.mjs';
 
-const noMock = process.argv[2]
-
-if (!noMock) {
-  await import('./notion-api-mock.spec.mjs')
-}
-
 dotenv.config()
+
+const databaseId = '610627a9-28b1-4477-b660-c00c5364435b'
 
 const limiter = new Bottleneck({
   maxConcurrent: 1,
@@ -27,7 +24,7 @@ const limiter = new Bottleneck({
 })
 
 const testCMS = new NotionCMS({
-  databaseId: '610627a9-28b1-4477-b660-c00c5364435b',
+  databaseId,
   notionAPIKey: process.env.NOTION,
   draftMode: true,
   debug: true,
@@ -49,16 +46,17 @@ test('tags', () => {
 
 // Tree structures
 test('siteData', () => {
-  // Ignore content for now
-  const filtered = structuredClone(testCMS.cms.siteData)
-  removeCircular(filtered)
-  assert.equal(filtered, expectedSiteData)
+  assert.equal(testCMS.cms.siteData, expectedSiteData)
+})
+
+// data getter
+test('data (getter)', () => {
+  assert.equal(testCMS.cms.siteData, testCMS.data)
 })
 
 // taggedCollection
 test('taggedCollection', () => {
   const results = testCMS.getTaggedCollection(['notion', 'programming'])
-  results.forEach(result => removeCircular(result))
   assert.equal(results, expectedTaggedCollection)
 })
 
@@ -100,6 +98,43 @@ test('walk from partial path', () => {
   const test = []
   testCMS.walk(node => test.push(node.name), '/products/category')
   assert.equal(test, ['Product B', 'Product A'])
+})
+
+test('async walk from partial path', async () => {
+  const test = []
+  await testCMS.asyncWalk(async node => await setTimeout(test.push(node.name), 300), '/products/category')
+  assert.equal(test, ['Product B', 'Product A'])
+})
+
+test('import', async () => {
+  assert.equal(
+    await testCMS.import(JSON.stringify({
+      metadata: {
+        databaseId,
+        rootUrl: ''
+      },
+      stages: [
+        'db',
+        'content',
+        'complete'
+      ],
+      routes: [],
+      tags: expectedTags,
+      tagGroups: expectedTagGroups,
+      siteData: expectedSiteData
+    })),
+    testCMS.cms
+  )
+})
+
+test('import fails', async () => {
+  try {
+    await testCMS.import();
+    assert.unreachable('should have thrown');
+  } catch (err) {
+    assert.instance(err, Error);
+
+  }
 })
 
 test.run();

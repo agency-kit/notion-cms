@@ -17,15 +17,24 @@ import type {
   UnsafePlugin,
   PluginPassthrough,
   PageContent,
+  FlatList,
+  FlatListItem
 } from "./types"
 import _ from 'lodash'
 import fs from 'fs'
-import path, { dirname } from 'path'
+import path from 'path'
 import { fileURLToPath } from 'url';
 import { AsyncCallbackFn, AsyncWalkBuilder, WalkBuilder, WalkNode } from 'walkjs'
-import { default as serializeJS } from 'serialize-javascript'
-import { parse, stringify } from 'flatted';
-import render from "./plugins/render"
+import {
+  filterAncestors,
+  JSONStringifyWithFunctions,
+  JSONParseWithFunctions,
+  writeFile,
+  slugify,
+  routify
+} from './utilities'
+
+import renderer from "./plugins/render"
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,59 +50,6 @@ const STEADY_PROPS = [
   "parent-page",
   "sub-page"
 ]
-
-function _deserialize(serializedJavascript: string) {
-  return eval?.('(' + serializedJavascript + ')');
-}
-
-function _replaceFuncs(key: string, value: any) {
-  return typeof value === 'function' ?
-    '__func__' + serializeJS(value) :
-    value
-}
-
-function _reviveFuncs(key: string, value: any) {
-  return typeof value === 'string' && value.startsWith('__func__') ?
-    _deserialize(value.replace('__func__', '')) :
-    value
-}
-
-function _filterAncestors(key: string, value: any) {
-  if (key === '_ancestors') return '[ancestors ref]'
-  return value
-}
-
-function JSONStringifyWithFunctions(obj: Object): string {
-  return stringify(obj, _replaceFuncs)
-}
-
-function JSONParseWithFunctions(string: string): Object {
-  return parse(string, _reviveFuncs)
-}
-
-function writeFile(path: string, contents: string): void {
-  fs.mkdirSync(dirname(path), { recursive: true })
-  fs.writeFileSync(path, contents);
-}
-
-Object.defineProperty(String.prototype, "slug", {
-  get: function () {
-    return _.kebabCase(this)
-  }
-})
-
-Object.defineProperty(String.prototype, "route", {
-  get: function (separator = "/") {
-    return this.padStart(this.length + 1, separator)
-  }
-})
-
-interface FlatListItem {
-  _key: string,
-  [pid: string]: string
-}
-
-type FlatList = FlatListItem[]
 
 export default class NotionCMS {
   cms: CMS
@@ -141,8 +97,11 @@ export default class NotionCMS {
     this.localCacheUrl = path.resolve(__dirname, this.localCacheDirectory + this.defaultCacheFilename)
     this.debug = debug
     this.limiter = limiter
-    this.plugins = this._dedupePlugins([...plugins, render({ blockRenderers: {} })])
     this.limiter.schedule.bind(limiter)
+
+    const coreRenderer = renderer({ blockRenderers: {} })
+    coreRenderer.name = 'core-renderer'
+    this.plugins = this._dedupePlugins([...plugins, coreRenderer])
   }
 
   get data() {
@@ -154,11 +113,6 @@ export default class NotionCMS {
     const routes = [] as Array<string>
     this.walk((node: PageContent) => { if (node.path) routes.push(node.path) })
     return routes
-  }
-
-  get toplevelDirectories() {
-    if (_.isEmpty(this.cms.siteData)) return
-    return Object.entries(this.cms.siteData)
   }
 
   _dedupePlugins(plugins: Array<Plugin | UnsafePlugin>): Array<Plugin | UnsafePlugin> {
@@ -223,15 +177,10 @@ export default class NotionCMS {
     return this._flatListToTree(list, 'id', 'pid', (node: FlatListItem) => !node.pid)
   }
 
-  _isPageContentObject(node: WalkNode): boolean {
+  static _isPageContentObject(node: WalkNode): boolean {
     return typeof node.key === 'string' && node?.key?.startsWith('/') &&
       ((typeof node?.parent?.key === 'string' && node?.parent?.key?.startsWith('/')) ||
         !node?.parent?.key)
-  }
-
-  _isTopLevelDir(response: PageObjectResponse): boolean {
-    const parentPage = response?.properties['parent-page'] as PageObjectRelation
-    return _.isEmpty(parentPage.relation)
   }
 
   _getParentPageId(response: PageObjectResponse): string {
@@ -286,31 +235,12 @@ export default class NotionCMS {
     return html
   }
 
-  async _getAuthorData(authorIds: Array<string>): Promise<Array<string>> {
-    let authors;
-    if (authorIds?.length) {
-      authors = await Promise.all(
-        authorIds.map(async (authorId: string) => {
-          return await this.limiter.schedule(
-            async () => await this.notionClient.users.retrieve({ user_id: authorId })
-          )
-        })
-      ).then(res => {
-        if (res?.length) {
-          return res.map(author => author.name as string)
-        }
-      })
-      return authors || []
-    }
-    return []
-  }
-
   async _getPageContent(state: CMS): Promise<CMS> {
     let stateWithContent = _.cloneDeep(state)
 
     await new AsyncWalkBuilder()
       .withCallback({
-        filters: [(node: WalkNode) => this._isPageContentObject(node)],
+        filters: [(node: WalkNode) => NotionCMS._isPageContentObject(node)],
         nodeTypeFilters: ['object'],
         positionFilter: 'postWalk',
         callback: async (node: WalkNode) => {
@@ -349,7 +279,7 @@ export default class NotionCMS {
     const tags = [] as Array<string>
     if (isFullPage(entry as PageObjectResponse)) {
       const name = this._getBlockName(entry)
-      const route = name.slug.route
+      const route = routify(name)
 
       const authorProp = entry.properties?.Author as PageObjectUser
       const authors = authorProp['people'].map(authorId => authorId.name as string)
@@ -364,7 +294,7 @@ export default class NotionCMS {
         {
           name,
           otherProps,
-          slug: name.slug,
+          slug: slugify(name),
           authors,
           tags,
           coverImage,
@@ -397,7 +327,7 @@ export default class NotionCMS {
       _(db.results)
         .filter(this._publishedFilter)
         .map(page => _.assign({}, {
-          _key: this._getBlockName(page).slug.route,
+          _key: routify(this._getBlockName(page)),
           id: page.id,
           pid: this._getParentPageId(page),
           _notion: page
@@ -437,7 +367,11 @@ export default class NotionCMS {
   async fetch(): Promise<CMS> {
     let cachedCMS
     if (fs.existsSync(this.localCacheUrl)) {
-      cachedCMS = JSONParseWithFunctions(fs.readFileSync(this.localCacheUrl, 'utf-8')) as CMS
+      try {
+        cachedCMS = JSONParseWithFunctions(fs.readFileSync(this.localCacheUrl, 'utf-8')) as CMS
+      } catch (e) {
+        if (this.debug) console.error('Parsing cached CMS failed. Using API instead.')
+      }
     }
     // Use refresh time to see if we should return local env cache or fresh api calls from Notion
     if (cachedCMS && cachedCMS.lastUpdateTimestamp &&
@@ -467,7 +401,7 @@ export default class NotionCMS {
     await new AsyncWalkBuilder()
       .withCallback({
         nodeTypeFilters: ['object'],
-        filters: [(node: WalkNode) => this._isPageContentObject(node)],
+        filters: [(node: WalkNode) => NotionCMS._isPageContentObject(node)],
         callback: (node: WalkNode) => cb(node.val) as AsyncCallbackFn
       })
       .withRootObjectCallbacks(false)
@@ -480,7 +414,7 @@ export default class NotionCMS {
     new WalkBuilder()
       .withCallback({
         nodeTypeFilters: ['object'],
-        filters: [(node: WalkNode) => this._isPageContentObject(node)],
+        filters: [(node: WalkNode) => NotionCMS._isPageContentObject(node)],
         callback: (node: WalkNode) => cb(node.val)
       })
       .withRootObjectCallbacks(false)
@@ -535,14 +469,24 @@ export default class NotionCMS {
     this.cms.lastUpdateTimestamp = Date.now()
     if (pretty) {
       // This drops Functions too, so only use for inspection
-      writeFile(path, JSON.stringify(this.cms, _filterAncestors))
+      writeFile(path, JSON.stringify(this.cms, filterAncestors))
     } else {
       writeFile(path, JSONStringifyWithFunctions(this.cms))
     }
   }
 
-  async import(previousState: string): Promise<CMS> {
-    const parsedPreviousState = JSONParseWithFunctions(previousState) as CMS
+  async import(previousState: string, flatted?: boolean): Promise<CMS> {
+    let parsedPreviousState
+    try {
+      if (flatted) {
+        parsedPreviousState = JSONParseWithFunctions(previousState) as CMS
+      } else {
+        parsedPreviousState = JSON.parse(previousState) as CMS
+      }
+    } catch (e) {
+      throw new Error(`Parsing input CMS failed.
+                      Make sure your input follows the NotionCMS spec, uses a validator plugin or a transformation plugin.`)
+    }
     const transformedPreviousState = await this._runPlugins(parsedPreviousState, 'import') as CMS
     return this.cms = transformedPreviousState
   }
