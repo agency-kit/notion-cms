@@ -140,7 +140,11 @@ export default class NotionCMS {
     for (const plugin of this.plugins.flat()) {
       if (plugin.hook === hook) {
         // pass in previous plugin output
-        val = await plugin.exec(val)
+        val = await plugin.exec(val, {
+          debug: !!this.debug,
+          localCacheDirectory: this.localCacheDirectory,
+          notion: this.notionClient
+        })
       }
     }
     return val

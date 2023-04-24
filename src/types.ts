@@ -5,6 +5,7 @@ import {
 } from '@notionhq/client/build/src/api-endpoints'
 
 import { Blocks } from '@notion-stuff/v4-types'
+import { Client } from '@notionhq/client'
 
 declare global {
   interface String {
@@ -106,17 +107,23 @@ export type RouteObject = [string, object]
 
 export type PluginPassthrough = Blocks | CMS | Page | string
 
+export interface PluginExecOptions {
+  debug?: boolean,
+  localCacheDirectory?: string,
+  notion?: Client
+}
+
 export interface Plugin {
   name: string,
   hook: 'import' | 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree'
-  exec: (context: PluginPassthrough) => PluginPassthrough
+  exec: (context: PluginPassthrough, instanceOptions?: PluginExecOptions) => PluginPassthrough
 }
 
 export interface UnsafePlugin {
   name: string,
   core: boolean,
   hook: 'parse' | 'import' | 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree'
-  exec: (context: PluginPassthrough) => PluginPassthrough
+  exec: (context: PluginPassthrough, instanceOptions?: PluginExecOptions) => PluginPassthrough
 }
 
 export interface FlatListItem {
