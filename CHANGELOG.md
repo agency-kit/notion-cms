@@ -1,5 +1,11 @@
 # @agency-kit/notion-cms
 
+## 0.4.1
+
+### Patch Changes
+
+- 65ab3c1: Add debug, local cache path, and notion client to each plugin exec function
+
 ## 0.4.0
 
 ### Minor Changes
