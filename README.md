@@ -1,5 +1,5 @@
 # _The_ Notion CMS
-![welcome_gltch](https://user-images.githubusercontent.com/68669571/234795918-989500dc-10b7-40dc-94cc-04ead3ea8ceb.png)
+![welcome_gltch](/public/welcome_gltch.png)
 
 Turn Notion into a full-fledged Headless CMS with this utility set.
 
