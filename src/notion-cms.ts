@@ -1,5 +1,6 @@
-import { Client, isFullPage } from "@notionhq/client"
+import { Client, isFullPage, LogLevel } from "@notionhq/client"
 import {
+  ListBlockChildrenResponse,
   PageObjectResponse,
   SelectPropertyItemObjectResponse
 } from '@notionhq/client/build/src/api-endpoints'
@@ -88,7 +89,8 @@ export default class NotionCMS {
     }
     this.cmsId = databaseId
     this.notionClient = new Client({
-      auth: notionAPIKey
+      auth: notionAPIKey,
+      ...(debug && { logLevel: LogLevel.DEBUG }),
     })
     this.refreshTimeout = refreshTimeout || 0
     this.draftMode = draftMode || false
@@ -225,15 +227,28 @@ export default class NotionCMS {
     return coverImage
   }
 
-  async _pullPageContent(id: string): Promise<string> {
-    const pageContent = await this.limiter.schedule(
-      async () => await this.notionClient.blocks.children.list({
-        block_id: id,
-        page_size: 100, // This is the max. TODO: Handle more blocks using pagination API.
-      })
-    )
+  async _pullPageContent(id: string): Promise<ListBlockChildrenResponse> {
+    let pageContent
+    try {
+      pageContent = await this.limiter.schedule(
+        async () => await this.notionClient.blocks.children.list({
+          block_id: id,
+          page_size: 100, // This is the max. TODO: Handle more blocks using pagination API.
+        })
+      )
+    } catch (e) {
+      if (this.debug) console.error(`NotionCMS Error: ${e}`)
+    }
+    for (const block of pageContent.results) {
+      if (block.has_children) {
+        block[block.type].children = (await this._pullPageContent(block.id)).results
+      }
+    }
+    return pageContent
+  }
 
-    const results = await this._runPlugins(pageContent.results, 'pre-parse')
+  async _parsePageContent(pageContent: ListBlockChildrenResponse): Promise<string> {
+    const results = await this._runPlugins(pageContent.results as Blocks, 'pre-parse')
     const parsedBlocks = await this._runPlugins(results as Blocks, 'parse')
     const html = await this._runPlugins(parsedBlocks, 'post-parse') as string
     return html
@@ -248,7 +263,8 @@ export default class NotionCMS {
         nodeTypeFilters: ['object'],
         positionFilter: 'postWalk',
         callback: async (node: WalkNode) => {
-          const content = await this._pullPageContent(node.val._notion.id)
+          const blocks = await this._pullPageContent(node.val._notion.id)
+          const content = await this._parsePageContent(blocks)
           _.assign(node.val, {
             content,
             ...(!node.val.coverImage && { coverImage: content.match(COVER_IMAGE_REGEX)?.[1] }),
@@ -279,12 +295,10 @@ export default class NotionCMS {
       .fromPairs().value()
   }
 
-  _getPageUpdate(entry: PageObjectResponse): Array<string | Page> {
+  _getPageUpdate(entry: PageObjectResponse): Page {
     const tags = [] as Array<string>
     if (isFullPage(entry as PageObjectResponse)) {
       const name = this._getBlockName(entry)
-      const route = routify(name)
-
       const authorProp = entry.properties?.Author as PageObjectUser
       const authors = authorProp['people'].map(authorId => authorId.name as string)
 
@@ -293,22 +307,20 @@ export default class NotionCMS {
       extractedTags.forEach(tag => tags.push(tag))
       const otherProps = this._extractUnsteadyProps(entry.properties)
 
-      return [
-        route,
-        {
-          name,
-          otherProps,
-          slug: slugify(name),
-          authors,
-          tags,
-          coverImage,
-          _notion: {
-            id: entry.id,
-            last_edited_time: entry.last_edited_time,
-          }
-        }]
+      return {
+        name,
+        otherProps,
+        slug: slugify(name),
+        authors,
+        tags,
+        coverImage,
+        _notion: {
+          id: entry.id,
+          last_edited_time: entry.last_edited_time,
+        }
+      }
     }
-    return []
+    return {}
   }
 
   _publishedFilter = (e: PageObjectResponse) => {
@@ -324,9 +336,14 @@ export default class NotionCMS {
 
   async _getDb(state: CMS): Promise<CMS> {
     let stateWithDb = _.cloneDeep(state)
-    const db = await this.limiter.schedule(
-      async () => await this.notionClient.databases.query({ database_id: state.metadata.databaseId })
-    )
+    let db
+    try {
+      db = await this.limiter.schedule(
+        async () => await this.notionClient.databases.query({ database_id: state.metadata.databaseId })
+      )
+    } catch (e) {
+      if (this.debug) console.error(`NotionCMS Error: ${e}`)
+    }
     stateWithDb.siteData = this._notionListToTree(
       _(db.results)
         .filter(this._publishedFilter)
@@ -348,7 +365,7 @@ export default class NotionCMS {
         nodeTypeFilters: ['object'],
         callback: (node: WalkNode) => {
           if (!node.val?._notion) return
-          const [route, update] = this._getPageUpdate(node.val._notion as PageObjectResponse)
+          const update = this._getPageUpdate(node.val._notion as PageObjectResponse)
           _.assign(node.val, update)
           _.assign(node.val, {
             path: node.getPath(node => `${node.key}`).replace('siteData', ''),
