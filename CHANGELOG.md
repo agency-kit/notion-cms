@@ -1,5 +1,13 @@
 # @agency-kit/notion-cms
 
+## 0.5.0
+
+### Minor Changes
+
+- 3d0d5d2: New: Add support for recursive extraction of child blocks from Notion API. Unlocks existing functionality in the Notion markdown parser.
+
+  Upd: Add official Notion debug logs in `debug` mode as well as error handling for API failure cases.
+
 ## 0.4.1
 
 ### Patch Changes
