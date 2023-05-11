@@ -1,4 +1,4 @@
-# _The_ Notion CMS
+# _The_ Notion CMS ![npm (scoped)](https://img.shields.io/npm/v/@agency-kit/notion-cms) ![workflow](https://github.com/agency-kit/notion-cms/actions/workflows/main.yml/badge.svg) ![npm](https://img.shields.io/npm/dm/@agency-kit/notion-cms) ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/agency-kit/notion-cms)
 
 ![logo_2](https://user-images.githubusercontent.com/68669571/235839441-00ed9c69-d43a-435f-9409-6c653676c2d5.png)
 
