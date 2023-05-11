@@ -19,9 +19,9 @@ import type {
   VideoBlock,
 } from '@notion-stuff/v4-types'
 import { z } from 'zod'
-import type { marked as Marked, Renderer as MarkedRenderer } from 'marked';
-import { marked } from 'marked';
-import hljs from 'highlight.js';
+import type { Renderer as MarkedRenderer } from 'marked'
+import { marked } from 'marked'
+import hljs from 'highlight.js'
 
 const blockRenderers = z.object({
   AudioBlock: z.function().returns(z.string()),
@@ -69,7 +69,7 @@ export default class NotionBlocksParser {
 
   constructor({ blockRenderers }: { blockRenderers: BlockRenderers }) {
     // @ts-expect-error need to make individual instances
-    this.mdParser = new NotionBlocksMarkdownParser()
+    this.mdParser = new NotionBlocksMarkdownParser() as NotionBlocksMarkdownParser
 
     this.mdParser.parseParagraph = modularize(
       blockRenderers.ParagraphBlock,
@@ -156,30 +156,30 @@ export default class NotionBlocksParser {
   }
 
   blocksToHtml(blocks: Blocks): string {
-    return this.htmlParser.parse(blocks) as string
+    return this.htmlParser.parse(blocks)
   }
 
   static parseRichText(richTexts: RichText[]) {
     // @ts-expect-error must access
-    const tempParser = new NotionBlocksMarkdownParser()
+    const tempParser = new NotionBlocksMarkdownParser() as NotionBlocksMarkdownParser
     return tempParser.parseRichTexts(richTexts)
   }
 }
 
 class NotionBlocksHtmlParser {
-  markdownParser: NotionBlocksMarkdownParser;
+  markdownParser: NotionBlocksMarkdownParser
   renderer: MarkedRenderer
 
   constructor(parser: NotionBlocksMarkdownParser) {
     this.markdownParser = parser
     this.renderer = new marked.Renderer()
-    // @ts-expect-error
-    this.renderer.html = this._mixedHtml
-    this.renderer.code = this._highlight
+    // @ts-expect-error codes
+    this.renderer.html = this._mixedHtml.bind(this)
+    this.renderer.code = this._highlight.bind(this)
   }
 
   parse(blocks: Blocks) {
-    const markdown = this.markdownParser.parse(blocks);
+    const markdown = this.markdownParser.parse(blocks)
     return marked(markdown, {
       renderer: this.renderer,
       pedantic: false,
@@ -188,22 +188,22 @@ class NotionBlocksHtmlParser {
       sanitize: false,
       smartLists: true,
       smartypants: false,
-      xhtml: false
-    });
+      xhtml: false,
+    })
   }
 
   _highlight(code: string, lang: string | undefined): string {
-    const language = (lang && hljs.getLanguage(lang)) ? lang : 'plaintext';
-    const higlighted = hljs.highlight(code, { language });
-    const langClass = 'language-' +
-      (!language || language.includes('plain') ? 'none' : language);
-    return `<pre><code class='hljs ${langClass}'>${higlighted.value}</code></pre>`;
+    const language = (lang && hljs.getLanguage(lang)) ? lang : 'plaintext'
+    const higlighted = hljs.highlight(code, { language })
+    const langClass = `language-${
+      (!language || language.includes('plain')) ? 'none' : language}`
+    return `<pre><code class='hljs ${langClass}'>${higlighted.value}</code></pre>`
   }
 
   _mixedHtml(this: typeof MarkedRenderer, mixedHtml: string) {
     return mixedHtml.replace(/[^<>]+?(?=<\/[figcaption|span])/g, (match) => {
-      const tokens = (marked as typeof Marked).lexer(match);
-      return (marked as typeof Marked).parser(tokens);
+      const tokens = (marked).lexer(match)
+      return (marked).parser(tokens)
     })
-  };
+  }
 }

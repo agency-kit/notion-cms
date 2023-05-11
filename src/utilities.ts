@@ -1,27 +1,29 @@
-import { default as serializeJS } from 'serialize-javascript'
-import { parse, stringify } from 'flatted';
-import { dirname } from 'path'
-import fs from 'fs'
+import { dirname } from 'node:path'
+import fs from 'node:fs'
+import serializeJS from 'serialize-javascript'
+import { parse, stringify } from 'flatted'
 import _ from 'lodash'
 
-export function deserialize(serializedJavascript: string) {
-  return eval?.('(' + serializedJavascript + ')');
+export function deserialize(serializedJavascript: string): Function {
+  // eslint-disable-next-line no-eval
+  return eval?.(`(${serializedJavascript})`) as Function
 }
 
-export function replaceFuncs(key: string, value: any) {
-  return typeof value === 'function' ?
-    '__func__' + serializeJS(value) :
-    value
+export function replaceFuncs(key: string, value: unknown) {
+  return typeof value === 'function'
+    ? `__func__${serializeJS(value)}`
+    : value
 }
 
-export function reviveFuncs(key: string, value: any) {
-  return typeof value === 'string' && value.startsWith('__func__') ?
-    deserialize(value.replace('__func__', '')) :
-    value
+export function reviveFuncs(key: string, value: unknown) {
+  return (typeof value === 'string' && value.startsWith('__func__'))
+    ? deserialize(value.replace('__func__', ''))
+    : value
 }
 
-export function filterAncestors(key: string, value: any) {
-  if (key === '_ancestors') return '[ancestors ref]'
+export function filterAncestors(key: string, value: unknown) {
+  if (key === '_ancestors')
+    return '[ancestors ref]'
   return value
 }
 
@@ -30,12 +32,12 @@ export function JSONStringifyWithFunctions(obj: Object): string {
 }
 
 export function JSONParseWithFunctions(string: string): Object {
-  return parse(string, reviveFuncs)
+  return parse(string, reviveFuncs) as Object
 }
 
 export function writeFile(path: string, contents: string): void {
   fs.mkdirSync(dirname(path), { recursive: true })
-  fs.writeFileSync(path, contents);
+  fs.writeFileSync(path, contents)
 }
 
 export function slugify(name: string): string {

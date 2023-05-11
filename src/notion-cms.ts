@@ -1,55 +1,56 @@
-import { Client, isFullPage, LogLevel } from "@notionhq/client"
-import {
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { Client, LogLevel, isFullBlock, isFullPage } from '@notionhq/client'
+import type {
   ListBlockChildrenResponse,
   PageObjectResponse,
-  SelectPropertyItemObjectResponse
+  QueryDatabaseResponse,
+  SelectPropertyItemObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
-import { Blocks } from '@notion-stuff/v4-types'
-import type {
-  Cover,
-  Options,
-  CMS,
-  Page,
-  PageObjectTitle,
-  PageObjectRelation,
-  PageObjectUser,
-  PageMultiSelect,
-  Plugin,
-  UnsafePlugin,
-  PluginPassthrough,
-  PageContent,
-  FlatList,
-  FlatListItem
-} from "./types"
+import type { Blocks } from '@notion-stuff/v4-types'
 import _ from 'lodash'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url';
-import { AsyncCallbackFn, AsyncWalkBuilder, WalkBuilder, WalkNode } from 'walkjs'
+import type { AsyncCallbackFn, WalkNode } from 'walkjs'
+import { AsyncWalkBuilder, WalkBuilder } from 'walkjs'
+import type {
+  CMS,
+  Cover,
+  FlatListItem,
+  Options,
+  Page,
+  PageContent,
+  PageMultiSelect,
+  PageObjectRelation,
+  PageObjectTitle,
+  PageObjectUser,
+  Plugin,
+  PluginPassthrough,
+  UnsafePlugin,
+} from './types'
 import {
-  filterAncestors,
-  JSONStringifyWithFunctions,
   JSONParseWithFunctions,
-  writeFile,
+  JSONStringifyWithFunctions,
+  filterAncestors,
+  routify,
   slugify,
-  routify
+  writeFile,
 } from './utilities'
 
-import renderer from "./plugins/render"
+import renderer from './plugins/render'
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const COVER_IMAGE_REGEX = /<figure notion-figure>[\s\S]+<img[^>]*src=['|"](https?:\/\/[^'|"]+)(?:['|"])/
 
 const STEADY_PROPS = [
-  "name",
-  "Author",
-  "Published",
-  "Tags",
-  "publishDate",
-  "parent-page",
-  "sub-page"
+  'name',
+  'Author',
+  'Published',
+  'Tags',
+  'publishDate',
+  'parent-page',
+  'sub-page',
 ]
 
 export default class NotionCMS {
@@ -73,19 +74,24 @@ export default class NotionCMS {
     refreshTimeout = 0,
     localCacheDirectory = './.notion-cms/',
     rootUrl = '',
-    limiter = { schedule: (func: Function) => { const result = func(); return Promise.resolve(result) } },
-    plugins = []
+    limiter = {
+      schedule: (func: Function) => {
+        const result = func() as unknown
+        return Promise.resolve(result)
+      },
+    },
+    plugins = [],
   }: Options = { databaseId: '', notionAPIKey: '' }) {
     this.cms = {
       metadata: {
         databaseId,
-        rootUrl: rootUrl || ''
+        rootUrl: rootUrl || '',
       },
       stages: [],
       routes: [],
       tags: [],
       tagGroups: {},
-      siteData: {}
+      siteData: {},
     }
     this.cmsId = databaseId
     this.notionClient = new Client({
@@ -95,7 +101,7 @@ export default class NotionCMS {
     this.refreshTimeout = refreshTimeout || 0
     this.draftMode = draftMode || false
     this.localCacheDirectory = localCacheDirectory
-    this.defaultCacheFilename = `cache.json`
+    this.defaultCacheFilename = 'cache.json'
     this.localCacheUrl = path.resolve(__dirname, this.localCacheDirectory + this.defaultCacheFilename)
     this.debug = debug
     this.limiter = limiter
@@ -107,22 +113,25 @@ export default class NotionCMS {
   }
 
   get data() {
-    if (_.isEmpty(this.cms.siteData)) return
+    if (_.isEmpty(this.cms.siteData))
+      return
     return this.cms.siteData
   }
 
   get routes(): Array<string> {
     const routes = [] as Array<string>
-    this.walk((node: PageContent) => { if (node.path) routes.push(node.path) })
+    this.walk((node: PageContent) => {
+      if (node.path)
+        routes.push(node.path)
+    })
     return routes
   }
 
   _dedupePlugins(plugins: Array<Plugin | UnsafePlugin>): Array<Plugin | UnsafePlugin> {
-    // @ts-ignore
-    const numParsePlugins = _.filter(plugins, { 'hook': 'parse' })
-    if (numParsePlugins.length > 1) {
+    const numParsePlugins = _.filter(plugins, { hook: 'parse' })
+    if (numParsePlugins.length > 1)
       return _.initial(plugins)
-    }
+
     return plugins
   }
 
@@ -132,20 +141,20 @@ export default class NotionCMS {
 
   async _runPlugins(
     context: PluginPassthrough,
-    hook: Plugin['hook'] | 'parse')
-    : Promise<PluginPassthrough> {
-    if (!this.plugins?.length) return context
-    if (this._checkDuplicateParsePlugins(this.plugins)) {
+    hook: Plugin['hook'] | 'parse'): Promise<PluginPassthrough> {
+    if (!this.plugins?.length)
+      return context
+    if (this._checkDuplicateParsePlugins(this.plugins))
       throw new Error('Only one parse-capable plugin must be used. Use the default NotionCMS render plugin.')
-    }
+
     let val = context
     for (const plugin of this.plugins.flat()) {
       if (plugin.hook === hook) {
-        // pass in previous plugin output
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         val = await plugin.exec(val, {
           debug: !!this.debug,
           localCacheDirectory: this.localCacheDirectory,
-          notion: this.notionClient
+          notion: this.notionClient,
         })
       }
     }
@@ -153,40 +162,41 @@ export default class NotionCMS {
   }
 
   _flatListToTree = (
-    flatList: FlatList,
+    flatList: Partial<FlatListItem>[],
     idPath: keyof FlatListItem,
     parentIdPath: keyof FlatListItem,
-    isRoot: (t: FlatListItem) => boolean,
+    isRoot: (t: Partial<FlatListItem>) => boolean,
   ): Record<string, Page> => {
-    const rootParents: FlatList = [];
-    const map: any = {};
+    const rootParents: Partial<FlatListItem>[] = []
+    const map = {} as { [x: string]: Partial<FlatListItem> }
     const tree = {}
+    for (const item of flatList)
+      map[item[idPath] as string] = item
+
     for (const item of flatList) {
-      map[item[idPath]] = item;
-    }
-    for (const item of flatList) {
-      const parentId = item[parentIdPath];
+      const parentId = item[parentIdPath]
       if (isRoot(item)) {
-        rootParents.push(item);
-      } else {
-        const parentItem = map[parentId];
-        parentItem[item._key] = item;
+        rootParents.push(item)
+      }
+      else {
+        const parentItem = map[parentId as string]
+        parentItem[item._key as string] = item
       }
     }
-    _.forEach(rootParents, page => {
-      _.assign(tree, { [page._key]: page })
+    _.forEach(rootParents, (page) => {
+      _.assign(tree, { [page._key as string]: page })
     })
-    return tree;
-  };
+    return tree
+  }
 
-  _notionListToTree(list: FlatList): Record<string, Page> {
-    return this._flatListToTree(list, 'id', 'pid', (node: FlatListItem) => !node.pid)
+  _notionListToTree(list: Partial<FlatListItem>[]): Record<string, Page> {
+    return this._flatListToTree(list, 'id', 'pid', (node: Partial<FlatListItem>) => !node.pid)
   }
 
   static _isPageContentObject(node: WalkNode): boolean {
-    return typeof node.key === 'string' && node?.key?.startsWith('/') &&
-      ((typeof node?.parent?.key === 'string' && node?.parent?.key?.startsWith('/')) ||
-        !node?.parent?.key)
+    return typeof node.key === 'string' && node?.key?.startsWith('/')
+      && ((typeof node?.parent?.key === 'string' && node?.parent?.key?.startsWith('/'))
+        || !node?.parent?.key)
   }
 
   _getParentPageId(response: PageObjectResponse): string {
@@ -205,44 +215,53 @@ export default class NotionCMS {
   }
 
   _assignTagGroup(tag: string, path: string, cms: CMS): void {
-    if (!cms.tagGroups[tag]) cms.tagGroups[tag] = []
+    if (!cms.tagGroups[tag])
+      cms.tagGroups[tag] = []
     cms.tagGroups[tag].push(path)
   }
 
   _buildTagGroups(tags: Array<string>, path: string, cms: CMS): void {
-    _.forEach(tags, tag => {
-      if (!_.includes(cms.tags, tag)) cms.tags.push(tag)
+    _.forEach(tags, (tag) => {
+      if (!_.includes(cms.tags, tag))
+        cms.tags.push(tag)
       this._assignTagGroup(tag, path, cms)
     })
   }
 
   _getCoverImage(page: PageObjectResponse): string | undefined {
-    const pageCoverProp = (page as PageObjectResponse)?.cover as Cover
-    let coverImage;
-    if (pageCoverProp && 'external' in pageCoverProp) {
+    const pageCoverProp = (page)?.cover as Cover
+    let coverImage
+    if (pageCoverProp && 'external' in pageCoverProp)
       coverImage = pageCoverProp?.external?.url
-    } else if (pageCoverProp?.file) {
+
+    else if (pageCoverProp?.file)
       coverImage = pageCoverProp?.file.url
-    }
+
     return coverImage
   }
 
-  async _pullPageContent(id: string): Promise<ListBlockChildrenResponse> {
+  async _pullPageContent(id: string): Promise<ListBlockChildrenResponse | undefined> {
     let pageContent
     try {
       pageContent = await this.limiter.schedule(
         async () => await this.notionClient.blocks.children.list({
           block_id: id,
           page_size: 100, // This is the max. TODO: Handle more blocks using pagination API.
-        })
-      )
-    } catch (e) {
-      if (this.debug) console.error(`NotionCMS Error: ${e}`)
+        }),
+      ) as ListBlockChildrenResponse
     }
+    catch (e) {
+      if (this.debug)
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        console.error(`NotionCMS Error: ${e}`)
+    }
+    if (!pageContent)
+      return
     for (const block of pageContent.results) {
-      if (block.has_children) {
-        block[block.type].children = (await this._pullPageContent(block.id)).results
-      }
+      if (isFullBlock(block) && block.has_children)
+        // @ts-expect-error children
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        block[block.type].children = (await this._pullPageContent(block.id))?.results
     }
     return pageContent
   }
@@ -263,20 +282,25 @@ export default class NotionCMS {
         nodeTypeFilters: ['object'],
         positionFilter: 'postWalk',
         callback: async (node: WalkNode) => {
-          const blocks = await this._pullPageContent(node.val._notion.id)
+          const value = node.val as PageContent
+          if (!value || !value?._notion?.id)
+            return
+          const blocks = await this._pullPageContent(value._notion.id)
+          if (!blocks)
+            return
           const content = await this._parsePageContent(blocks)
-          _.assign(node.val, {
+          _.assign(value, {
             content,
-            ...(!node.val.coverImage && { coverImage: content.match(COVER_IMAGE_REGEX)?.[1] }),
-            _ancestors: this._gatherNodeAncestors(node)
+            ...(!value.coverImage && { coverImage: content.match(COVER_IMAGE_REGEX)?.[1] }),
+            _ancestors: this._gatherNodeAncestors(node),
           })
           _.assign(
-            node.val,
-            await this._runPlugins(node.val, 'during-tree') as Page)
-          delete node.val.otherProps
+            value,
+            await this._runPlugins(value, 'during-tree') as Page)
+          delete value.otherProps
           // We only want access to ancestors for plugins, otherwise it creates circular ref headaches.
-          delete node.val._ancestors
-        }
+          delete value._ancestors
+        },
       })
       .withRootObjectCallbacks(false)
       .withParallelizeAsyncCallbacks(true)
@@ -287,8 +311,7 @@ export default class NotionCMS {
     return stateWithContent
   }
 
-  _extractUnsteadyProps(properties: PageObjectResponse['properties'])
-    : PageObjectResponse['properties'] {
+  _extractUnsteadyProps(properties: PageObjectResponse['properties']): PageObjectResponse['properties'] {
     return _(properties)
       .entries()
       .reject(([key]) => _.includes(STEADY_PROPS, key))
@@ -297,13 +320,13 @@ export default class NotionCMS {
 
   _getPageUpdate(entry: PageObjectResponse): Page {
     const tags = [] as Array<string>
-    if (isFullPage(entry as PageObjectResponse)) {
+    if (isFullPage(entry)) {
       const name = this._getBlockName(entry)
       const authorProp = entry.properties?.Author as PageObjectUser
-      const authors = authorProp['people'].map(authorId => authorId.name as string)
+      const authors = authorProp.people.map(authorId => authorId.name as string)
 
-      const coverImage = this._getCoverImage(entry as PageObjectResponse)
-      const extractedTags = this._extractTags(entry as PageObjectResponse)
+      const coverImage = this._getCoverImage(entry)
+      const extractedTags = this._extractTags(entry)
       extractedTags.forEach(tag => tags.push(tag))
       const otherProps = this._extractUnsteadyProps(entry.properties)
 
@@ -317,65 +340,74 @@ export default class NotionCMS {
         _notion: {
           id: entry.id,
           last_edited_time: entry.last_edited_time,
-        }
+        },
       }
     }
     return {}
   }
 
   _publishedFilter = (e: PageObjectResponse) => {
-    const publishProp = e.properties['Published'] as SelectPropertyItemObjectResponse
-    return this.draftMode ? true : publishProp.select && publishProp.select.name === 'Published'
+    const publishProp = e.properties.Published as SelectPropertyItemObjectResponse
+    return this.draftMode ? true : (publishProp.select && publishProp.select.name === 'Published')
   }
 
   _gatherNodeAncestors(node: WalkNode): Array<PageContent> {
-    return _(node.ancestors).map(ancestor => {
-      if (ancestor.val._notion) return ancestor.val
+    return _(node.ancestors).map((ancestor) => {
+      if ((ancestor.val as PageContent)._notion)
+        return ancestor.val as PageContent
+      return false
     }).compact().value()
   }
 
-  async _getDb(state: CMS): Promise<CMS> {
+  async _getDb(state: CMS): Promise<CMS | undefined> {
     let stateWithDb = _.cloneDeep(state)
     let db
     try {
       db = await this.limiter.schedule(
-        async () => await this.notionClient.databases.query({ database_id: state.metadata.databaseId })
-      )
-    } catch (e) {
-      if (this.debug) console.error(`NotionCMS Error: ${e}`)
+        async () => await this.notionClient.databases.query({ database_id: state.metadata.databaseId }),
+      ) as QueryDatabaseResponse
     }
+    catch (e) {
+      if (this.debug)
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        console.error(`NotionCMS Error: ${e}`)
+    }
+    if (!db)
+      return
     stateWithDb.siteData = this._notionListToTree(
       _(db.results)
+        // @ts-expect-error filter
         .filter(this._publishedFilter)
         .map(page => _.assign({}, {
-          _key: routify(this._getBlockName(page)),
+          _key: routify(this._getBlockName(page as PageObjectResponse)),
           id: page.id,
-          pid: this._getParentPageId(page),
-          _notion: page
+          pid: this._getParentPageId(page as PageObjectResponse),
+          _notion: page,
         }))
-        .value()
+        .value(),
     )
 
-    if (_.isEmpty(stateWithDb.siteData)) {
+    if (_.isEmpty(stateWithDb.siteData))
       throw new Error('NotionCMS is empty. Did you mean to set `draftMode: true`?')
-    }
 
     new WalkBuilder()
       .withCallback({
         nodeTypeFilters: ['object'],
         callback: (node: WalkNode) => {
-          if (!node.val?._notion) return
-          const update = this._getPageUpdate(node.val._notion as PageObjectResponse)
-          _.assign(node.val, update)
-          _.assign(node.val, {
-            path: node.getPath(node => `${node.key}`).replace('siteData', ''),
-            url: stateWithDb.metadata.rootUrl && path ?
-              stateWithDb.metadata.rootUrl as string + path : ''
+          const value = node.val as PageContent
+          if (!value?._notion)
+            return
+          const update = this._getPageUpdate(value._notion as PageObjectResponse)
+          _.assign(value, update)
+          _.assign(value, {
+            path: node.getPath(node => `${node.key as string}`).replace('siteData', ''),
+            url: (stateWithDb.metadata.rootUrl && value.path)
+              ? (`stateWithDb.metadata.rootUrl as string ${value.path}`)
+              : '',
           })
-          if (node.key && typeof node.key === 'string') {
-            this._buildTagGroups(node.val.tags, node.val.path, stateWithDb)
-          }
-        }
+          if (node.key && typeof node.key === 'string' && value.tags && value.path)
+            this._buildTagGroups(value.tags, value.path, stateWithDb)
+        },
       })
       .withRootObjectCallbacks(false)
       .walk(stateWithDb)
@@ -390,30 +422,39 @@ export default class NotionCMS {
     if (fs.existsSync(this.localCacheUrl)) {
       try {
         cachedCMS = JSONParseWithFunctions(fs.readFileSync(this.localCacheUrl, 'utf-8')) as CMS
-      } catch (e) {
-        if (this.debug) console.error('Parsing cached CMS failed. Using API instead.')
+      }
+      catch (e) {
+        if (this.debug)
+          console.error('Parsing cached CMS failed. Using API instead.')
       }
     }
     // Use refresh time to see if we should return local env cache or fresh api calls from Notion
-    if (cachedCMS && cachedCMS.lastUpdateTimestamp &&
-      Date.now() < (cachedCMS.lastUpdateTimestamp + this.refreshTimeout)) {
-      if (this.debug) console.log('using cache')
+    if (cachedCMS && cachedCMS.lastUpdateTimestamp
+      && Date.now() < (cachedCMS.lastUpdateTimestamp + this.refreshTimeout)) {
+      if (this.debug)
+        console.log('using cache')
       this.cms = cachedCMS
-    } else {
-      if (this.debug) console.log('using API')
+    }
+    else {
+      if (this.debug)
+        console.log('using API')
       if (!_.includes(this.cms.stages, 'db')) {
-        this.cms = await this._getDb(this.cms)
+        const cmsOutput = await this._getDb(this.cms)
+        if (!cmsOutput)
+          throw new Error('NotionCMS Error: DB fetch unsuccessful.')
+        this.cms = cmsOutput
       }
+
       if (!_.includes(this.cms.stages, 'content')) {
         this.cms = await this._getPageContent(this.cms)
         this.cms.stages.push('complete')
       }
-      if (_.includes(this.cms.stages, 'complete')) {
+      if (_.includes(this.cms.stages, 'complete'))
         this.export()
-      }
     }
     void this.routes
-    if (this.debug) writeFile('debug/site-data.json', JSONStringifyWithFunctions(this.cms))
+    if (this.debug)
+      writeFile('debug/site-data.json', JSONStringifyWithFunctions(this.cms))
     return this.cms
   }
 
@@ -423,7 +464,7 @@ export default class NotionCMS {
       .withCallback({
         nodeTypeFilters: ['object'],
         filters: [(node: WalkNode) => NotionCMS._isPageContentObject(node)],
-        callback: (node: WalkNode) => cb(node.val) as AsyncCallbackFn
+        callback: (node: WalkNode) => cb(node.val) as AsyncCallbackFn,
       })
       .withRootObjectCallbacks(false)
       .withParallelizeAsyncCallbacks(true)
@@ -436,28 +477,29 @@ export default class NotionCMS {
       .withCallback({
         nodeTypeFilters: ['object'],
         filters: [(node: WalkNode) => NotionCMS._isPageContentObject(node)],
-        callback: (node: WalkNode) => cb(node.val)
+        callback: (node: WalkNode) => cb(node.val) as unknown,
       })
       .withRootObjectCallbacks(false)
       .walk(startPoint)
   }
 
   getTaggedCollection(tags: string | Array<string>): Array<Page | undefined> {
-    if (!_.isArray(tags)) tags = [tags]
+    if (!_.isArray(tags))
+      tags = [tags]
     const taggedPages = [] as Array<string>
-    for (const tag of tags) {
+    for (const tag of tags)
       taggedPages.push(...this.cms.tagGroups[tag])
-    }
-    if (typeof this.cms.siteData !== 'string') {
+
+    if (typeof this.cms.siteData !== 'string')
       return _(taggedPages).map(path => this.queryByPath(path)).uniq().value()
-    }
+
     return []
   }
 
   filterSubPages(pathOrPage: string | Page): Array<Page> {
-    if (typeof pathOrPage === 'string') {
-      pathOrPage = this.queryByPath(pathOrPage) as Page
-    }
+    if (typeof pathOrPage === 'string')
+      pathOrPage = this.queryByPath(pathOrPage)
+
     return _(pathOrPage)
       .entries()
       .filter(([key]) => key.startsWith('/'))
@@ -465,9 +507,9 @@ export default class NotionCMS {
   }
 
   rejectSubPages(pathOrPage: string | Page): Page {
-    if (typeof pathOrPage === 'string') {
-      pathOrPage = this.queryByPath(pathOrPage) as Page
-    }
+    if (typeof pathOrPage === 'string')
+      pathOrPage = this.queryByPath(pathOrPage)
+
     return _(pathOrPage)
       .entries()
       .reject(([key]) => key.startsWith('/'))
@@ -476,22 +518,22 @@ export default class NotionCMS {
 
   queryByPath(path: string): Page {
     const segments = path.split('/').slice(1)
-    //@ts-ignore-next-line
     let access: Page = this.cms.siteData
     for (const segment of segments) {
-      //@ts-ignore-next-line
-      access = access['/' + segment]
+      // @ts-expect-error-next-line
+      access = access[`/${segment}`] as Page
     }
     return access
   }
 
   export({ pretty = false, path = this.localCacheUrl }:
-    { pretty?: boolean, path?: string } = {}) {
+  { pretty?: boolean; path?: string } = {}) {
     this.cms.lastUpdateTimestamp = Date.now()
     if (pretty) {
       // This drops Functions too, so only use for inspection
       writeFile(path, JSON.stringify(this.cms, filterAncestors))
-    } else {
+    }
+    else {
       writeFile(path, JSONStringifyWithFunctions(this.cms))
     }
   }
@@ -499,12 +541,13 @@ export default class NotionCMS {
   async import(previousState: string, flatted?: boolean): Promise<CMS> {
     let parsedPreviousState
     try {
-      if (flatted) {
+      if (flatted)
         parsedPreviousState = JSONParseWithFunctions(previousState) as CMS
-      } else {
+
+      else
         parsedPreviousState = JSON.parse(previousState) as CMS
-      }
-    } catch (e) {
+    }
+    catch (e) {
       throw new Error(`Parsing input CMS failed.
                       Make sure your input follows the NotionCMS spec, uses a validator plugin or a transformation plugin.`)
     }

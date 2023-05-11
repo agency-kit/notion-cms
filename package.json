@@ -1,12 +1,41 @@
 {
   "name": "@agency-kit/notion-cms",
   "version": "0.5.0",
-  "description": "turn notion into a content management system with this utility set.",
-  "main": "./dist/index.js",
+  "description": "Turn Notion into a headless content management system with this utility set.",
+  "author": "Jacob Milhorn",
+  "license": "MIT",
+  "homepage": "https://github.com/agency-kit/notion-cms#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agency-kit/notion-cms.git"
+  },
+  "bugs": {
+    "url": "https://github.com/agency-kit/notion-cms/issues"
+  },
+  "keywords": [
+    "notion",
+    "content",
+    "content management",
+    "cms",
+    "notion-cms",
+    "notion cms",
+    "notion content management",
+    "static site generation",
+    "ssg",
+    "ssr",
+    "server side rendered",
+    "server rendered",
+    "node",
+    "11ty",
+    "eleventy",
+    "headless cms",
+    "headless content management system"
+  ],
   "exports": {
     "require": "./dist/index.js",
     "default": "./dist/index.mjs"
   },
+  "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./index.d.ts",
   "scripts": {
@@ -16,40 +45,26 @@
     "build": "rm -rf dist && tsc --project ./tsconfig.json && rollup -c && npm run dts",
     "dts": "dts-bundle-generator -o index.d.ts src/index.ts --no-check && rm -rf .tmp",
     "test": "NODE_OPTIONS='--enable-source-maps' npx c8 uvu test",
-    "build:test": "npm run build && npm run test"
+    "build:test": "npm run build && npm run test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/agency-kit/notion-cms.git"
-  },
-  "keywords": [
-    "notion",
-    "content",
-    "management",
-    "cms"
-  ],
-  "author": "Jacob Milhorn",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/agency-kit/notion-cms/issues"
-  },
-  "homepage": "https://github.com/agency-kit/notion-cms#readme",
   "dependencies": {
-    "@changesets/cli": "^2.26.1",
-    "@notion-stuff/blocks-html-parser": "^6.0.0",
     "@notion-stuff/blocks-markdown-parser": "^6.0.0",
     "@notionhq/client": "^2.2.3",
-    "@types/marked": "^4.0.8",
     "flatted": "^3.2.7",
     "highlight.js": "^11.7.0",
     "lodash": "^4.17.21",
     "marked": "^4.2.12",
     "serialize-javascript": "^6.0.1",
-    "tslib": "^2.5.0",
     "walkjs": "^4.0.5",
     "zod": "^3.21.4"
   },
   "devDependencies": {
+    "tslib": "^2.5.0",
+    "@types/marked": "^4.0.8",
+    "@changesets/cli": "^2.26.1",
+    "@antfu/eslint-config": "^0.38.6",
     "@notion-stuff/v4-types": "^6.0.0",
     "@rollup/plugin-terser": "^0.4.0",
     "@types/lodash": "^4.14.191",
@@ -64,8 +79,15 @@
     "nock": "^13.3.0",
     "rollup": "^3.19.1",
     "rollup-plugin-esbuild": "^5.0.0",
+    "simple-git-hooks": "^2.8.1",
     "terser": "^5.16.6",
     "typescript": "^4.9.5",
     "uvu": "^0.5.6"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged"
+  },
+  "lint-staged": {
+    "*": "eslint --fix"
   }
 }

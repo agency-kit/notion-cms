@@ -1,8 +1,8 @@
 import type { Blocks } from '@notion-stuff/v4-types'
+import _ from 'lodash'
 import type { BlockRenderers } from '../notion-blocks-parser'
 import NotionBlocksParser from '../notion-blocks-parser'
-import { UnsafePlugin, PluginPassthrough } from '../types'
-import _ from 'lodash'
+import type { PluginPassthrough, UnsafePlugin } from '../types'
 
 export default function ({
   blockRenderers,

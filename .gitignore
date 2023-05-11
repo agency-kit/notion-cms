@@ -4,3 +4,4 @@ debug
 dist
 index.d.ts
 coverage/
+.vscode/

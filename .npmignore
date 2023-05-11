@@ -8,3 +8,6 @@ tsconfig.json
 rollup.config.js
 dist/.notion-cms
 .github/
+public/
+rollup.config.mjs
+.eslintrc.js
