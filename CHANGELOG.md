@@ -1,5 +1,12 @@
 # @agency-kit/notion-cms
 
+## 0.5.1
+
+### Patch Changes
+
+- 60efae2: Fix: Address deeply nested rendering bugs by pulling in the Notion-Blocks-HTML-parser (Thanks @notion-stuff) and reworking some of the internals.
+  Fix: Remove deprecated `headerIds` option in `marked` and instead use the header-id extension.
+
 ## 0.5.0
 
 ### Minor Changes
