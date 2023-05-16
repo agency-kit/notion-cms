@@ -1,17 +1,17 @@
-import NotionCMS from '../dist/index.mjs'
+import { setTimeout } from 'node:timers/promises'
 import dotenv from 'dotenv'
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
-import { setTimeout } from 'timers/promises';
+import { test } from 'uvu'
+import * as assert from 'uvu/assert'
+import NotionCMS from '../dist/index.mjs'
 
 import {
-  expectedRoutes,
   expectedRejectedPageData,
-  expectedTags,
+  expectedRoutes,
   expectedSiteData,
+  expectedTagGroups,
   expectedTaggedCollection,
-  expectedTagGroups
-} from './notion-api-mock.spec.mjs';
+  expectedTags,
+} from './notion-api-mock.spec.mjs'
 
 dotenv.config()
 
@@ -21,7 +21,7 @@ const testCMS = new NotionCMS({
   databaseId,
   notionAPIKey: process.env.NOTION,
   draftMode: true,
-  debug: true
+  debug: true,
 })
 
 await testCMS.fetch()
@@ -60,7 +60,6 @@ test('query by path', () => {
   const category = testCMS.queryByPath('/products/category')
   assert.equal(category.name, 'Category')
 })
-
 
 // filter sub pages
 test('filter sub pages', () => {
@@ -105,29 +104,30 @@ test('import', async () => {
     await testCMS.import(JSON.stringify({
       metadata: {
         databaseId,
-        rootUrl: ''
+        rootUrl: '',
       },
       stages: [
         'db',
         'content',
-        'complete'
+        'complete',
       ],
       routes: [],
       tags: expectedTags,
       tagGroups: expectedTagGroups,
-      siteData: expectedSiteData
+      siteData: expectedSiteData,
     })),
-    testCMS.cms
+    testCMS.cms,
   )
 })
 
 test('import fails', async () => {
   try {
-    await testCMS.import();
-    assert.unreachable('should have thrown');
-  } catch (err) {
-    assert.instance(err, Error);
+    await testCMS.import()
+    assert.unreachable('should have thrown')
+  }
+  catch (err) {
+    assert.instance(err, Error)
   }
 })
 
-test.run();
+test.run()
