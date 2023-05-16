@@ -29,7 +29,9 @@
     "11ty",
     "eleventy",
     "headless cms",
-    "headless content management system"
+    "headless content management system",
+    "framework agnostic",
+    "agnostic"
   ],
   "exports": {
     "require": "./dist/index.js",
