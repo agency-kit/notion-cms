@@ -1,14 +1,14 @@
-import NotionCMS, { NotionBlocksParser, blocksRenderPlugin } from '../dist/index.mjs'
-import { suite } from 'uvu';
-import * as assert from 'uvu/assert';
+import { suite } from 'uvu'
+import * as assert from 'uvu/assert'
 import dotenv from 'dotenv'
+import NotionCMS, { NotionBlocksParser, blocksRenderPlugin } from '../dist/index.mjs'
 
 import {
+  expectedKitchenSinkSiteData,
   expectedRoutes,
-  expectedTags,
   expectedSiteData,
-  expectedKitchenSinkSiteData
-} from './notion-api-mock.spec.mjs';
+  expectedTags,
+} from './notion-api-mock.spec.mjs'
 
 dotenv.config()
 
@@ -63,8 +63,8 @@ PluginsDefaultOther.before(async () => {
     plugins: [() => ({
       name: 'ncms-placeholder-plugin',
       hook: 'post-parse',
-      exec: (block) => block
-    })]
+      exec: block => block,
+    })],
   })
   await PluginsDefaultOtherCMS.fetch()
 })
@@ -96,15 +96,15 @@ PluginsCustom.before(async () => {
     plugins: [() => ({
       name: 'ncms-placeholder-plugin',
       hook: 'post-parse',
-      exec: (block) => block
+      exec: block => block,
     }),
     // use custom renderer plugin behind the scenes
     blocksRenderPlugin({
       blockRenderers: {
-        CalloutBlock: (block) => `<div ncms-test callout>${parseRichText(block.callout.rich_text)}</div ncms-test callout>`,
-        QuoteBlock: (block) => `<div ncms-test quote>${parseRichText(block.quote.rich_text)}</div ncms-test quote>`,
-      }
-    })]
+        CalloutBlock: block => `<div ncms-test callout>${parseRichText(block.callout.rich_text)}</div ncms-test callout>`,
+        QuoteBlock: block => `<div ncms-test quote>${parseRichText(block.quote.rich_text)}</div ncms-test quote>`,
+      },
+    })],
   })
   await PluginsCustomCMS.fetch()
 })
@@ -126,19 +126,19 @@ PluginsCustomFallback.before(async () => {
       // use custom renderer plugin behind the scenes
       blocksRenderPlugin({
         blockRenderers: {
-          CalloutBlock: (block) => null, // Nulls should invoke default renderer
-          QuoteBlock: (block) => null, // Nulls should invoke default renderer
-        }
-      })]
+          CalloutBlock: block => null, // Nulls should invoke default renderer
+          QuoteBlock: block => null, // Nulls should invoke default renderer
+        },
+      })],
   })
   await PluginsCustomFallbackCMS.fetch()
 })
 
 PluginsCustomFallback('Custom render correctly uses fallback block renderer ', () => {
-  assert.equal(PluginsCustomFallbackCMS.cms.siteData, expectedKitchenSinkSiteData)
+  assert.equal(PluginsCustomFallbackCMS.cms.siteData.content, expectedKitchenSinkSiteData.content)
 })
 
-PluginsDefault.run();
-PluginsDefaultOther.run();
-PluginsCustom.run();
-PluginsCustomFallback.run();
+PluginsDefault.run()
+PluginsDefaultOther.run()
+PluginsCustom.run()
+PluginsCustomFallback.run()

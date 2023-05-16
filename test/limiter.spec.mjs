@@ -1,18 +1,18 @@
-import Bottleneck from "bottleneck";
-import NotionCMS from '../dist/index.mjs'
+import { setTimeout } from 'node:timers/promises'
+import Bottleneck from 'bottleneck'
 import dotenv from 'dotenv'
-import { test } from 'uvu';
-import * as assert from 'uvu/assert';
-import { setTimeout } from 'timers/promises';
+import { test } from 'uvu'
+import * as assert from 'uvu/assert'
+import NotionCMS from '../dist/index.mjs'
 
 import {
-  expectedRoutes,
   expectedRejectedPageData,
+  expectedRoutes,
   expectedSiteData,
+  expectedTagGroups,
   expectedTaggedCollection,
   expectedTags,
-  expectedTagGroups
-} from './notion-api-mock.spec.mjs';
+} from './notion-api-mock.spec.mjs'
 
 dotenv.config()
 
@@ -20,7 +20,7 @@ const databaseId = '610627a9-28b1-4477-b660-c00c5364435b'
 
 const limiter = new Bottleneck({
   maxConcurrent: 1,
-  minTime: 333
+  minTime: 333,
 })
 
 const testCMS = new NotionCMS({
@@ -28,7 +28,7 @@ const testCMS = new NotionCMS({
   notionAPIKey: process.env.NOTION,
   draftMode: true,
   debug: true,
-  limiter
+  limiter,
 })
 
 await testCMS.fetch()
@@ -111,30 +111,30 @@ test('import', async () => {
     await testCMS.import(JSON.stringify({
       metadata: {
         databaseId,
-        rootUrl: ''
+        rootUrl: '',
       },
       stages: [
         'db',
         'content',
-        'complete'
+        'complete',
       ],
       routes: [],
       tags: expectedTags,
       tagGroups: expectedTagGroups,
-      siteData: expectedSiteData
+      siteData: expectedSiteData,
     })),
-    testCMS.cms
+    testCMS.cms,
   )
 })
 
 test('import fails', async () => {
   try {
-    await testCMS.import();
-    assert.unreachable('should have thrown');
-  } catch (err) {
-    assert.instance(err, Error);
-
+    await testCMS.import()
+    assert.unreachable('should have thrown')
+  }
+  catch (err) {
+    assert.instance(err, Error)
   }
 })
 
-test.run();
+test.run()
