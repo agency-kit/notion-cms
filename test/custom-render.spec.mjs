@@ -101,8 +101,8 @@ PluginsCustom.before(async () => {
     // use custom renderer plugin behind the scenes
     blocksRenderPlugin({
       blockRenderers: {
-        CalloutBlock: block => `<div ncms-test callout>${parseRichText(block.callout.rich_text)}</div ncms-test callout>`,
-        QuoteBlock: block => `<div ncms-test quote>${parseRichText(block.quote.rich_text)}</div ncms-test quote>`,
+        CalloutBlock: block => `<div ncms-test callout>${parseRichText(block.callout.rich_text)}</div ncms-test callout>\n\n`,
+        QuoteBlock: block => `<div ncms-test quote>${parseRichText(block.quote.rich_text)}</div ncms-test quote>\n\n`,
       },
     })],
   })
@@ -110,8 +110,8 @@ PluginsCustom.before(async () => {
 })
 
 PluginsCustom('Custom render correctly alters blocks', () => {
-  assert.ok(PluginsCustomCMS.data['/kitchen-sink'].content.match(/<div ncms-test callout>(.*)<\/div ncms-test callout>/g))
-  assert.ok(PluginsCustomCMS.data['/kitchen-sink'].content.match(/<div ncms-test quote>(.*)<\/div ncms-test quote>/g))
+  assert.ok(PluginsCustomCMS.data['/kitchen-sink'].content.match(/<div ncms-test callout>([.|\s\S]*)<\/div ncms-test callout>/g))
+  assert.ok(PluginsCustomCMS.data['/kitchen-sink'].content.match(/<div ncms-test quote>([.|\s\S]*)<\/div ncms-test quote>/g))
 })
 
 const PluginsCustomFallback = suite('PluginsCustomFallback')

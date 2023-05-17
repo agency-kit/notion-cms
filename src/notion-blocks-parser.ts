@@ -64,9 +64,11 @@ function modularize(
 export default class NotionBlocksParser {
   mdParser: NotionBlocksMarkdownParser
   htmlParser: NotionBlocksHtmlParser
+  debug: boolean
 
-  constructor({ blockRenderers }: { blockRenderers: BlockRenderers }) {
+  constructor({ blockRenderers, debug }: { blockRenderers: BlockRenderers; debug?: boolean }) {
     this.mdParser = new NotionBlocksMarkdownParser()
+    this.debug = debug || false
 
     this.mdParser.parseParagraph = modularize(
       blockRenderers.ParagraphBlock,
@@ -145,7 +147,7 @@ export default class NotionBlocksParser {
       this.mdParser.parseRichTexts.bind(this.mdParser) as Renderer,
     ) as (block: RichText[]) => string
 
-    this.htmlParser = new NotionBlocksHtmlParser(this.mdParser)
+    this.htmlParser = new NotionBlocksHtmlParser(this.mdParser, this.debug)
   }
 
   blocksToMarkdown(blocks: Blocks, depth?: number): string {

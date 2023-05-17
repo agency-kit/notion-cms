@@ -107,7 +107,7 @@ export default class NotionCMS {
     this.limiter = limiter
     this.limiter.schedule.bind(limiter)
 
-    const coreRenderer = renderer({ blockRenderers: {} })
+    const coreRenderer = renderer({ blockRenderers: {}, debug })
     coreRenderer.name = 'core-renderer'
     this.plugins = this._dedupePlugins([...plugins, coreRenderer])
   }

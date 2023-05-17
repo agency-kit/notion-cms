@@ -11,9 +11,12 @@ export default class NotionBlocksHtmlParser {
   markdownParser: NotionBlocksMarkdownParser
   renderer: MarkedRenderer
   markedOptions
+  debug: boolean
 
-  constructor(parser: NotionBlocksMarkdownParser) {
+  constructor(parser: NotionBlocksMarkdownParser, debug?: boolean) {
     this.markdownParser = parser
+    this.debug = debug || false
+
     this.renderer = new marked.Renderer()
     this.renderer.code = this._highlight.bind(this)
     this.markedOptions = {
@@ -35,7 +38,13 @@ export default class NotionBlocksHtmlParser {
   }
 
   parse(blocks: Blocks) {
-    const markdown = this.markdownParser.parse(blocks)
+    let markdown = this.markdownParser.parse(blocks)
+    // if (this.debug)
+    //   fs.writeFileSync('./debug/parsed.md', markdown)
+    // Take another pass to wrap any deeply nested mixed HTML content's inner text in p tags
+    markdown = this._mixedHTML(markdown)
+    // if (this.debug)
+    //   fs.appendFileSync('./debug/parsed.md', `--------ALTERED----------**\n\n\n${markdown}`)
     return marked(markdown)
   }
 
@@ -45,5 +54,12 @@ export default class NotionBlocksHtmlParser {
     const langClass = `language-${
       (!language || language.includes('plain')) ? 'none' : language}`
     return `<pre><code class='hljs ${langClass}'>${higlighted.value}</code></pre>`
+  }
+
+  _mixedHTML(mixedHtml: string) {
+    return mixedHtml.replaceAll(/[^<>]+?(?=<\/)/g, (match) => {
+      const tokens = marked.lexer(match)
+      return marked.parser(tokens)
+    })
   }
 }
