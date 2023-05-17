@@ -6,14 +6,15 @@ import type { PluginPassthrough, UnsafePlugin } from '../types'
 
 export default function ({
   blockRenderers,
-}: { blockRenderers: BlockRenderers }) {
+  debug,
+}: { blockRenderers: BlockRenderers; debug?: boolean }) {
   return {
     name: 'ncms-plugin-blocks-render',
     core: true,
     hook: 'parse',
     exec: (context: PluginPassthrough): string => {
       const copyOfContext = _.cloneDeep(context) as Blocks
-      const parser = new NotionBlocksParser({ blockRenderers })
+      const parser = new NotionBlocksParser({ blockRenderers, debug })
       return parser.blocksToHtml(copyOfContext)
     },
   } satisfies UnsafePlugin
