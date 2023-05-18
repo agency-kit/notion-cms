@@ -1,5 +1,11 @@
 # @agency-kit/notion-cms
 
+## 0.5.7
+
+### Patch Changes
+
+- 4a2b7d3: Upd: use manual npmrc creation in action.
+
 ## 0.5.6
 
 ### Patch Changes
