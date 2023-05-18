@@ -1,12 +1,12 @@
 # _The_ Notion CMS ![npm (scoped)](https://img.shields.io/npm/v/@agency-kit/notion-cms) ![workflow](https://github.com/agency-kit/notion-cms/actions/workflows/main.yml/badge.svg) ![npm](https://img.shields.io/npm/dm/@agency-kit/notion-cms) ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/agency-kit/notion-cms)
 
-![logo_2](https://user-images.githubusercontent.com/68669571/235839441-00ed9c69-d43a-435f-9409-6c653676c2d5.png)
+![logo_2](/public/subtle_gltch_logo.png)
 
 Turn Notion into a full-fledged Headless CMS with this utility set.
 
 🌲  Build a collection-based CMS tree from your Notion database.  
 🎚️  Leverage database sub-items.  
-⚙️   Geared for Static Site Generation.  
+⚙️   Geared for Static Site Generation with Notion markdown -> HTML output.  
 🗃️  Content Caching for super fast builds.  
 🧩  Plugin ready with some powerful core plugins on the way.  
 🦾  Tagging, filtering, path queries, and tree-walking utilities.  
@@ -41,7 +41,6 @@ See the structure in this template https://cooked-shovel-3c3.notion.site/Communi
 - [x] plugin system and core plugins
 - [x] arbitrary notion properties handling
 - [ ] optimized content caching
-- [ ] custom paths
 
 ## Basic Usage
 
@@ -91,7 +90,7 @@ const myAdvancedCMS = new NotionCMS({
   databaseId: 'e4fcd5b3-1d6a-4afd-b951-10d56ce436ad',
   notionAPIKey: process.env.NOTION,
   rootUrl: 'https://mycoolsite.com',
-  localCacheDirectory: './localcache/',
+  localCacheDirectory: `${process.cwd()}/localcache/`,
   refreshTimeout: 1000 * 60 * 60,
   plugins: [customPlugin()],
 })
