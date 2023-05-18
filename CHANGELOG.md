@@ -1,5 +1,11 @@
 # @agency-kit/notion-cms
 
+## 0.5.5
+
+### Patch Changes
+
+- 09208f8: Fix: Add build to release action but don't test. We test for every PR so this is fine.
+
 ## 0.5.4
 
 ### Patch Changes
