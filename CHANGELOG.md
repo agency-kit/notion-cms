@@ -1,5 +1,11 @@
 # @agency-kit/notion-cms
 
+## 0.5.4
+
+### Patch Changes
+
+- 4e9f98c: Fix: Remove debug console logs from tests
+
 ## 0.5.3
 
 ### Patch Changes
