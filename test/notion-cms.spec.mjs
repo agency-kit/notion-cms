@@ -21,7 +21,6 @@ const testCMS = new NotionCMS({
   databaseId,
   notionAPIKey: process.env.NOTION,
   draftMode: true,
-  debug: true,
 })
 
 await testCMS.fetch()
