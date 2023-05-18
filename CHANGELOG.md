@@ -1,5 +1,11 @@
 # @agency-kit/notion-cms
 
+## 0.5.3
+
+### Patch Changes
+
+- fc92ad0: Fix: make sure that debug=true doesn't write to files (bug in last build) and remove indents so Marked doesn't wrap them in code tags.
+
 ## 0.5.2
 
 ### Patch Changes
