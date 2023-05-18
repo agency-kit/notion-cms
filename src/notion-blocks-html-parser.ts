@@ -2,6 +2,7 @@ import type { Renderer as MarkedRenderer } from 'marked'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import type { Blocks } from '@notion-stuff/v4-types'
+import _ from 'lodash'
 
 // @ts-expect-error module
 import { gfmHeadingId } from 'marked-gfm-heading-id'
@@ -58,7 +59,8 @@ export default class NotionBlocksHtmlParser {
 
   _mixedHTML(mixedHtml: string) {
     return mixedHtml.replaceAll(/[^<>]+?(?=<\/)/g, (match) => {
-      const tokens = marked.lexer(match)
+      // Must trim or Marked classifies text preceded by tabs as indented code.
+      const tokens = marked.lexer(_.trim(match))
       return marked.parser(tokens)
     })
   }
