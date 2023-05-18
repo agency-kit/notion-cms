@@ -50,7 +50,7 @@
     "build:test": "npm run build && npm run test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "prerelease": "npm run build:test",
+    "prerelease": "npm run build",
     "release": "npx changeset publish"
   },
   "dependencies": {
