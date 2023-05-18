@@ -1,5 +1,11 @@
 # @agency-kit/notion-cms
 
+## 0.5.6
+
+### Patch Changes
+
+- b4a71fd: Upd: new logo and minor readme updates.
+
 ## 0.5.5
 
 ### Patch Changes
