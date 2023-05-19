@@ -5,3 +5,4 @@ dist
 index.d.ts
 coverage/
 .vscode/
+my.secrets

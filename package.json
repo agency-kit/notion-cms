@@ -44,13 +44,14 @@
     "dev": "tsc --watch",
     "watch": "NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 chokidar \"src/**/*.ts\" -c \"rollup -c && tsc --project ./tsconfig.json && npx uvu test\"",
     "test:no-mock": "node test/notion-cms.spec.js true",
-    "build": "rm -rf dist && tsc --project ./tsconfig.json && rollup -c && npm run dts",
+    "build": "rm -rf dist && tsc --project ./tsconfig.json && rollup -c",
+    "build:dts": "rm -rf dist && tsc --project ./tsconfig.json && rollup -c && npm run dts",
     "dts": "dts-bundle-generator -o index.d.ts src/index.ts --no-check && rm -rf .tmp",
     "test": "NODE_OPTIONS='--enable-source-maps' npx c8 uvu test",
     "build:test": "npm run build && npm run test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "release": "npm run build && changeset publish"
+    "release": "changeset publish"
   },
   "dependencies": {
     "@notionhq/client": "^2.2.3",
