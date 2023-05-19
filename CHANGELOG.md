@@ -1,5 +1,11 @@
 # @agency-kit/notion-cms
 
+## 0.5.8
+
+### Patch Changes
+
+- 03c9c9a: Fix: Update CI to run tests and publish. Remove vscode settings from publish.
+
 ## 0.5.7
 
 ### Patch Changes
