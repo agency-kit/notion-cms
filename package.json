@@ -50,7 +50,7 @@
     "build:test": "npm run build && npm run test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "release": "npm run build && npm run changeset publish"
+    "release": "npm run build && changeset publish"
   },
   "dependencies": {
     "@notionhq/client": "^2.2.3",
