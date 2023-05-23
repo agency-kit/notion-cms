@@ -8,13 +8,14 @@ export default function ({
   blockRenderers,
   debug,
 }: { blockRenderers: BlockRenderers; debug?: boolean }) {
+  const parser = new NotionBlocksParser({ blockRenderers, debug })
   return {
+    parser,
     name: 'ncms-plugin-blocks-render',
     core: true,
     hook: 'parse',
     exec: (context: PluginPassthrough): string => {
       const copyOfContext = _.cloneDeep(context) as Blocks
-      const parser = new NotionBlocksParser({ blockRenderers, debug })
       return parser.blocksToHtml(copyOfContext)
     },
   } satisfies UnsafePlugin

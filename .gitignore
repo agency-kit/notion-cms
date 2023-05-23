@@ -6,3 +6,4 @@ index.d.ts
 coverage/
 .vscode/
 my.secrets
+.tmp/

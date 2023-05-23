@@ -1,19 +1,20 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Client, LogLevel, isFullBlock, isFullPage } from '@notionhq/client'
+import { Client, LogLevel, collectPaginatedAPI, isFullBlock, isFullPage } from '@notionhq/client'
 import type {
-  ListBlockChildrenResponse,
+  BlockObjectResponse,
   PageObjectResponse,
-  QueryDatabaseResponse,
   SelectPropertyItemObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
 import type { Blocks } from '@notion-stuff/v4-types'
 import _ from 'lodash'
 import type { AsyncCallbackFn, WalkNode } from 'walkjs'
 import { AsyncWalkBuilder, WalkBuilder } from 'walkjs'
+import humanInterval from 'human-interval'
 import type {
   CMS,
+  Content,
   Cover,
   FlatListItem,
   Options,
@@ -57,7 +58,7 @@ export default class NotionCMS {
   cms: CMS
   cmsId: string
   notionClient: Client
-  refreshTimeout: number
+  refreshTimeout: number | string
   draftMode: boolean
   defaultCacheFilename: string
   localCacheDirectory: string
@@ -65,6 +66,8 @@ export default class NotionCMS {
   debug: boolean | undefined
   limiter: { schedule: Function }
   plugins: Array<Plugin | UnsafePlugin> | undefined
+  private timer: number
+  private coreRenderer: UnsafePlugin
 
   constructor({
     databaseId,
@@ -82,10 +85,14 @@ export default class NotionCMS {
     },
     plugins = [],
   }: Options = { databaseId: '', notionAPIKey: '' }) {
+    this.timer = Date.now()
     this.cms = {
       metadata: {
         databaseId,
         rootUrl: rootUrl || '',
+        stats: {
+          duration: 0,
+        },
       },
       stages: [],
       routes: [],
@@ -98,7 +105,8 @@ export default class NotionCMS {
       auth: notionAPIKey,
       ...(debug && { logLevel: LogLevel.DEBUG }),
     })
-    this.refreshTimeout = refreshTimeout || 0
+    this.refreshTimeout
+      = (refreshTimeout && _.isString(refreshTimeout)) ? (humanInterval(refreshTimeout) || refreshTimeout) : 0
     this.draftMode = draftMode || false
     this.localCacheDirectory = localCacheDirectory
     this.defaultCacheFilename = 'cache.json'
@@ -107,9 +115,9 @@ export default class NotionCMS {
     this.limiter = limiter
     this.limiter.schedule.bind(limiter)
 
-    const coreRenderer = renderer({ blockRenderers: {}, debug })
-    coreRenderer.name = 'core-renderer'
-    this.plugins = this._dedupePlugins([...plugins, coreRenderer])
+    this.coreRenderer = renderer({ blockRenderers: {}, debug })
+    this.coreRenderer.name = 'core-renderer'
+    this.plugins = this._dedupePlugins([...plugins, this.coreRenderer])
   }
 
   get data() {
@@ -240,15 +248,14 @@ export default class NotionCMS {
     return coverImage
   }
 
-  async _pullPageContent(id: string): Promise<ListBlockChildrenResponse | undefined> {
+  async _pullPageContent(id: string): Promise<BlockObjectResponse[] | undefined> {
     let pageContent
     try {
       pageContent = await this.limiter.schedule(
-        async () => await this.notionClient.blocks.children.list({
+        async () => await collectPaginatedAPI(this.notionClient.blocks.children.list, {
           block_id: id,
-          page_size: 100, // This is the max. TODO: Handle more blocks using pagination API.
         }),
-      ) as ListBlockChildrenResponse
+      ) as BlockObjectResponse[]
     }
     catch (e) {
       if (this.debug)
@@ -257,20 +264,26 @@ export default class NotionCMS {
     }
     if (!pageContent)
       return
-    for (const block of pageContent.results) {
+    for (const block of pageContent) {
       if (isFullBlock(block) && block.has_children)
         // @ts-expect-error children
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        block[block.type].children = (await this._pullPageContent(block.id))?.results
+        block[block.type].children = (await this._pullPageContent(block.id))
     }
     return pageContent
   }
 
-  async _parsePageContent(pageContent: ListBlockChildrenResponse): Promise<string> {
-    const results = await this._runPlugins(pageContent.results as Blocks, 'pre-parse')
+  async _parsePageContent(pageContent: BlockObjectResponse[]): Promise<Content> {
+    const results = await this._runPlugins(pageContent as Blocks, 'pre-parse')
+    const markdown: string = this.coreRenderer.parser.blocksToMarkdown(pageContent as Blocks)
+    const plaintext: string = this.coreRenderer.parser.markdownToPlainText(markdown)
     const parsedBlocks = await this._runPlugins(results as Blocks, 'parse')
     const html = await this._runPlugins(parsedBlocks, 'post-parse') as string
-    return html
+    return {
+      plaintext,
+      markdown,
+      html,
+    }
   }
 
   async _getPageContent(state: CMS): Promise<CMS> {
@@ -291,7 +304,7 @@ export default class NotionCMS {
           const content = await this._parsePageContent(blocks)
           _.assign(value, {
             content,
-            ...(!value.coverImage && { coverImage: content.match(COVER_IMAGE_REGEX)?.[1] }),
+            ...(!value.coverImage && { coverImage: content.html.match(COVER_IMAGE_REGEX)?.[1] }),
             _ancestors: this._gatherNodeAncestors(node),
           })
           _.assign(
@@ -364,8 +377,10 @@ export default class NotionCMS {
     let db
     try {
       db = await this.limiter.schedule(
-        async () => await this.notionClient.databases.query({ database_id: state.metadata.databaseId }),
-      ) as QueryDatabaseResponse
+        async () => (await collectPaginatedAPI(
+          this.notionClient.databases.query, { database_id: state.metadata.databaseId },
+        )),
+      ) as PageObjectResponse[]
     }
     catch (e) {
       if (this.debug)
@@ -375,13 +390,13 @@ export default class NotionCMS {
     if (!db)
       return
     stateWithDb.siteData = this._notionListToTree(
-      _(db.results)
+      _(db)
         // @ts-expect-error filter
         .filter(this._publishedFilter)
         .map(page => _.assign({}, {
-          _key: routify(this._getBlockName(page as PageObjectResponse)),
+          _key: routify(this._getBlockName(page)),
           id: page.id,
-          pid: this._getParentPageId(page as PageObjectResponse),
+          pid: this._getParentPageId(page),
           _notion: page,
         }))
         .value(),
@@ -430,7 +445,7 @@ export default class NotionCMS {
     }
     // Use refresh time to see if we should return local env cache or fresh api calls from Notion
     if (cachedCMS && cachedCMS.lastUpdateTimestamp
-      && Date.now() < (cachedCMS.lastUpdateTimestamp + this.refreshTimeout)) {
+      && Date.now() < (cachedCMS.lastUpdateTimestamp + _.toNumber(this.refreshTimeout))) {
       if (this.debug)
         console.log('using cache')
       this.cms = cachedCMS
@@ -452,7 +467,8 @@ export default class NotionCMS {
       if (_.includes(this.cms.stages, 'complete'))
         this.export()
     }
-    void this.routes
+    this.cms.routes = this.routes
+    this.cms.metadata.stats.duration = (Date.now() - this.timer) / 1000 // duration in seconds
     if (this.debug)
       writeFile('debug/site-data.json', JSONStringifyWithFunctions(this.cms))
     return this.cms

@@ -6,6 +6,7 @@ import type {
 
 import type { Blocks } from '@notion-stuff/v4-types'
 import type { Client } from '@notionhq/client'
+import type NotionBlocksParser from './notion-blocks-parser'
 
 declare global {
   interface String {
@@ -21,11 +22,24 @@ export interface Options {
   notionAPIKey: string
   debug?: boolean
   draftMode?: boolean
-  refreshTimeout?: number // in ms
+  refreshTimeout?: number | string // in ms or converted from human readable string
   localCacheDirectory?: string
   rootUrl?: string | URL | undefined // Used to generate full path links,
   limiter?: { schedule: Function }
   plugins?: Array<Plugin | UnsafePlugin>
+}
+
+interface Stats {
+  duration: number
+  totalAPICalls?: number
+  failedCalls?: number
+  totalPages?: number
+}
+
+export interface Content {
+  plaintext: string
+  markdown: string
+  html: string
 }
 
 export interface CMS {
@@ -34,6 +48,7 @@ export interface CMS {
   metadata: {
     rootUrl?: string | URL | undefined
     databaseId: string
+    stats: Stats
   }
   routes: Array<string | Array<string>>
   tags: Array<string>
@@ -56,7 +71,7 @@ export interface PageContent {
   slug?: string
   tags?: Array<string>
   coverImage?: string
-  content?: string
+  content?: Content
 }
 
 export interface Route {
@@ -121,6 +136,7 @@ export interface Plugin {
 }
 
 export interface UnsafePlugin {
+  parser: NotionBlocksParser
   name: string
   core: boolean
   hook: 'parse' | 'import' | 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree'

@@ -24,6 +24,13 @@ let PluginsDefaultCMS,
 // Helper Function for parsing internal block rich text
 const parseRichText = NotionBlocksParser.parseRichText
 
+// temporarily ignore md and plaintext versions of content
+function filterContent(content) {
+  delete content.plaintext
+  delete content.markdown
+  return content
+}
+
 const PluginsDefault = suite('PluginsDefault')
 
 PluginsDefault.before(async () => {
@@ -34,6 +41,7 @@ PluginsDefault.before(async () => {
     // No Plugins - use default renderer plugin behind the scenes
   })
   await PluginsDefaultCMS.fetch()
+  PluginsDefaultCMS.walk(node => filterContent(node.content))
 })
 
 // routes
@@ -67,6 +75,7 @@ PluginsDefaultOther.before(async () => {
     })],
   })
   await PluginsDefaultOtherCMS.fetch()
+  PluginsDefaultOtherCMS.walk(node => filterContent(node.content))
 })
 
 // routes
@@ -107,11 +116,12 @@ PluginsCustom.before(async () => {
     })],
   })
   await PluginsCustomCMS.fetch()
+  PluginsCustomCMS.walk(node => filterContent(node.content))
 })
 
 PluginsCustom('Custom render correctly alters blocks', () => {
-  assert.ok(PluginsCustomCMS.data['/kitchen-sink'].content.match(/<div ncms-test callout>([.|\s\S]*)<\/div ncms-test callout>/g))
-  assert.ok(PluginsCustomCMS.data['/kitchen-sink'].content.match(/<div ncms-test quote>([.|\s\S]*)<\/div ncms-test quote>/g))
+  assert.ok(PluginsCustomCMS.data['/kitchen-sink'].content.html.match(/<div ncms-test callout>([.|\s\S]*)<\/div ncms-test callout>/g))
+  assert.ok(PluginsCustomCMS.data['/kitchen-sink'].content.html.match(/<div ncms-test quote>([.|\s\S]*)<\/div ncms-test quote>/g))
 })
 
 const PluginsCustomFallback = suite('PluginsCustomFallback')
@@ -132,10 +142,11 @@ PluginsCustomFallback.before(async () => {
       })],
   })
   await PluginsCustomFallbackCMS.fetch()
+  PluginsCustomFallbackCMS.walk(node => filterContent(node.content))
 })
 
 PluginsCustomFallback('Custom render correctly uses fallback block renderer ', () => {
-  assert.equal(PluginsCustomFallbackCMS.cms.siteData.content, expectedKitchenSinkSiteData.content)
+  assert.equal(PluginsCustomFallbackCMS.cms.siteData['/kitchen-sink'].content.html, expectedKitchenSinkSiteData['/kitchen-sink'].content.html)
 })
 
 PluginsDefault.run()
