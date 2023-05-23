@@ -20,6 +20,7 @@ import type {
 import { z } from 'zod'
 import NotionBlocksMarkdownParser from './notion-blocks-md-parser'
 import NotionBlocksHtmlParser from './notion-blocks-html-parser'
+import NotionBlocksPlaintextParser from './notion-blocks-plaintext-parser'
 
 const blockRenderers = z.object({
   AudioBlock: z.function().returns(z.string()),
@@ -64,90 +65,101 @@ function modularize(
 export default class NotionBlocksParser {
   mdParser: NotionBlocksMarkdownParser
   htmlParser: NotionBlocksHtmlParser
+  plainTextParser: NotionBlocksPlaintextParser
   debug: boolean
 
-  constructor({ blockRenderers, debug }: { blockRenderers: BlockRenderers; debug?: boolean }) {
+  constructor({ blockRenderers, debug }: { blockRenderers?: BlockRenderers; debug?: boolean }) {
     this.mdParser = new NotionBlocksMarkdownParser()
+    this.plainTextParser = new NotionBlocksPlaintextParser()
     this.debug = debug || false
 
     this.mdParser.parseParagraph = modularize(
-      blockRenderers.ParagraphBlock,
+      blockRenderers?.ParagraphBlock,
       this.mdParser.parseParagraph.bind(this.mdParser) as Renderer,
     ) as (block: ParagraphBlock) => string
 
     this.mdParser.parseCodeBlock = modularize(
-      blockRenderers.CodeBlock,
+      blockRenderers?.CodeBlock,
       this.mdParser.parseCodeBlock.bind(this.mdParser) as Renderer,
     ) as (block: CodeBlock) => string
 
     this.mdParser.parseQuoteBlock = modularize(
-      blockRenderers.QuoteBlock,
+      blockRenderers?.QuoteBlock,
       this.mdParser.parseQuoteBlock.bind(this.mdParser) as Renderer,
     ) as (block: QuoteBlock) => string
 
     this.mdParser.parseCalloutBlock = modularize(
-      blockRenderers.CalloutBlock,
+      blockRenderers?.CalloutBlock,
       this.mdParser.parseCalloutBlock.bind(this.mdParser) as Renderer,
     ) as (block: CalloutBlock) => string
 
     this.mdParser.parseHeading = modularize(
-      blockRenderers.HeadingBlock,
+      blockRenderers?.HeadingBlock,
       this.mdParser.parseHeading.bind(this.mdParser) as Renderer,
     ) as (block: HeadingBlock) => string
 
     this.mdParser.parseBulletedListItems = modularize(
-      blockRenderers.BulletedListItemBlock,
+      blockRenderers?.BulletedListItemBlock,
       this.mdParser.parseBulletedListItems.bind(this.mdParser) as Renderer,
     ) as (block: BulletedListItemBlock) => string
 
     this.mdParser.parseNumberedListItems = modularize(
-      blockRenderers.NumberedListItemBlock,
+      blockRenderers?.NumberedListItemBlock,
       this.mdParser.parseNumberedListItems.bind(this.mdParser) as Renderer,
     ) as (block: NumberedListItemBlock) => string
 
     this.mdParser.parseTodoBlock = modularize(
-      blockRenderers.ToDoBlock,
+      blockRenderers?.ToDoBlock,
       this.mdParser.parseTodoBlock.bind(this.mdParser) as Renderer,
     ) as (block: ToDoBlock) => string
 
     this.mdParser.parseImageBlock = modularize(
-      blockRenderers.ImageBlock,
+      blockRenderers?.ImageBlock,
       this.mdParser.parseImageBlock.bind(this.mdParser) as Renderer,
     ) as (block: ImageBlock) => string
 
     this.mdParser.parseEmbedBlock = modularize(
-      blockRenderers.EmbedBlock,
+      blockRenderers?.EmbedBlock,
       this.mdParser.parseEmbedBlock.bind(this.mdParser) as Renderer,
     ) as (block: EmbedBlock) => string
 
     this.mdParser.parseAudioBlock = modularize(
-      blockRenderers.AudioBlock,
+      blockRenderers?.AudioBlock,
       this.mdParser.parseAudioBlock.bind(this.mdParser) as Renderer,
     ) as (block: AudioBlock) => string
 
     this.mdParser.parseVideoBlock = modularize(
-      blockRenderers.VideoBlock,
+      blockRenderers?.VideoBlock,
       this.mdParser.parseVideoBlock.bind(this.mdParser) as Renderer,
     ) as (block: VideoBlock) => string
 
     this.mdParser.parseFileBlock = modularize(
-      blockRenderers.FileBlock,
+      blockRenderers?.FileBlock,
       this.mdParser.parseFileBlock.bind(this.mdParser) as Renderer,
     ) as (block: FileBlock) => string
 
     this.mdParser.parsePdfBlock = modularize(
-      blockRenderers.PDFBlock,
+      blockRenderers?.PDFBlock,
       this.mdParser.parsePdfBlock.bind(this.mdParser) as Renderer,
     ) as (block: PDFBlock) => string
 
     // Warning: this parser is used in many of the other parsers internally.
     // Modding it could affect the others unexpectedly.
     this.mdParser.parseRichTexts = modularize(
-      blockRenderers.RichText,
+      blockRenderers?.RichText,
       this.mdParser.parseRichTexts.bind(this.mdParser) as Renderer,
     ) as (block: RichText[]) => string
 
     this.htmlParser = new NotionBlocksHtmlParser(this.mdParser, this.debug)
+  }
+
+  markdownToPlainText(markdown: string): string {
+    return this.plainTextParser.parse(markdown)
+  }
+
+  blocksToPlainText(blocks: Blocks, depth?: number): string {
+    return this.plainTextParser.parse(
+      this.blocksToMarkdown(blocks, depth))
   }
 
   blocksToMarkdown(blocks: Blocks, depth?: number): string {

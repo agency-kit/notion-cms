@@ -13,3 +13,4 @@ rollup.config.mjs
 .eslintrc.js
 my.secrets
 .vscode/
+.tmp/

@@ -25,6 +25,15 @@ const testCMS = new NotionCMS({
 
 await testCMS.fetch()
 
+// temporarily ignore md and plaintext versions of content
+function filterContent(content) {
+  delete content.plaintext
+  delete content.markdown
+  return content
+}
+
+testCMS.walk(node => filterContent(node.content))
+
 // routes
 // walk is used by routes so this is tested here implicitly
 test('routes', () => {

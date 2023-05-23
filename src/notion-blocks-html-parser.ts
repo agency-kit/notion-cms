@@ -25,17 +25,19 @@ export default class NotionBlocksHtmlParser {
       pedantic: false,
       mangle: false,
       gfm: true,
+      headerIds: true,
       breaks: false,
       sanitize: false,
       smartypants: false,
       xhtml: false,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      extensions: [gfmHeadingId({ prefix: '' })],
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call
-    marked.use(this.markedOptions, gfmHeadingId({ prefix: '' }))
+    marked.use({ silent: true })
   }
 
   marked(md: string): string {
-    return marked(md)
+    return marked(md, this.markedOptions)
   }
 
   parse(blocks: Blocks) {
@@ -46,7 +48,7 @@ export default class NotionBlocksHtmlParser {
     markdown = this._mixedHTML(markdown)
     // if (this.debug)
     //   fs.appendFileSync('./debug/parsed.md', `--------ALTERED----------**\n\n\n${markdown}`)
-    return marked(markdown)
+    return marked(markdown, this.markedOptions)
   }
 
   _highlight(code: string, lang: string | undefined): string {
@@ -60,8 +62,8 @@ export default class NotionBlocksHtmlParser {
   _mixedHTML(mixedHtml: string) {
     return mixedHtml.replaceAll(/[^<>]+?(?=<\/)/g, (match) => {
       // Must trim or Marked classifies text preceded by tabs as indented code.
-      const tokens = marked.lexer(_.trim(match))
-      return marked.parser(tokens)
+      const tokens = marked.lexer(_.trim(match), this.markedOptions)
+      return marked.parser(tokens, this.markedOptions)
     })
   }
 }
