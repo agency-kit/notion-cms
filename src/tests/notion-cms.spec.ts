@@ -1,9 +1,12 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import { setTimeout } from 'node:timers/promises'
-import Bottleneck from 'bottleneck'
 import dotenv from 'dotenv'
-import { test } from 'uvu'
+import { suite } from 'uvu'
 import * as assert from 'uvu/assert'
-import NotionCMS from '../dist/index.mjs'
+import NotionCMS from '../../dist/index.mjs'
+
+import type { Content, PageContent } from '../types'
 
 import {
   expectedRejectedPageData,
@@ -12,64 +15,60 @@ import {
   expectedTagGroups,
   expectedTaggedCollection,
   expectedTags,
-} from './notion-api-mock.spec.mjs'
+} from './notion-api-mock.spec'
 
 dotenv.config()
 
+export const TestNotionCMS = suite('TestNotionCMS')
+
 const databaseId = '610627a9-28b1-4477-b660-c00c5364435b'
 
-const limiter = new Bottleneck({
-  maxConcurrent: 1,
-  minTime: 333,
-})
-
-const testCMS = new NotionCMS({
+const testCMS: NotionCMS = new NotionCMS({
   databaseId,
   notionAPIKey: process.env.NOTION,
   draftMode: true,
-  limiter,
 })
 
 await testCMS.fetch()
 
 // temporarily ignore md and plaintext versions of content
-function filterContent(content) {
+function filterContent(content: Content) {
   delete content.plaintext
   delete content.markdown
   return content
 }
 
-testCMS.walk(node => filterContent(node.content))
+testCMS.walk((node: PageContent) => filterContent(node.content))
 
 // routes
 // walk is used by routes so this is tested here implicitly
-test('routes', () => {
+TestNotionCMS('routes', () => {
   assert.equal(testCMS.routes.sort(), expectedRoutes.sort())
 })
 
 // tags
-test('tags', () => {
+TestNotionCMS('tags', () => {
   assert.equal(testCMS.cms.tags.sort(), expectedTags.sort())
 })
 
 // Tree structures
-test('siteData', () => {
+TestNotionCMS('siteData', () => {
   assert.equal(testCMS.cms.siteData, expectedSiteData)
 })
 
 // data getter
-test('data (getter)', () => {
+TestNotionCMS('data (getter)', () => {
   assert.equal(testCMS.cms.siteData, testCMS.data)
 })
 
 // taggedCollection
-test('taggedCollection', () => {
+TestNotionCMS('taggedCollection', () => {
   const results = testCMS.getTaggedCollection(['notion', 'programming'])
   assert.equal(results, expectedTaggedCollection)
 })
 
 // query by path
-test('query by path', () => {
+TestNotionCMS('query by path', () => {
   const productB = testCMS.queryByPath('/products/category/product-b')
   assert.equal(productB.name, 'Product B')
   const category = testCMS.queryByPath('/products/category')
@@ -77,10 +76,10 @@ test('query by path', () => {
 })
 
 // filter sub pages
-test('filter sub pages', () => {
+TestNotionCMS('filter sub pages', () => {
   const category = testCMS.queryByPath('/products/category')
   const productsInCategory = testCMS.filterSubPages(category)
-  const names = productsInCategory.map(product => product.name)
+  const names = productsInCategory.map((product: PageContent) => product.name)
   assert.equal(names, ['Product B', 'Product A'])
 
   // Uncomment when fuzzy search is built
@@ -91,7 +90,7 @@ test('filter sub pages', () => {
 })
 
 // reject sub pages
-test('reject sub pages', () => {
+TestNotionCMS('reject sub pages', () => {
   const category = testCMS.queryByPath('/products/category')
   const categoryProps = testCMS.rejectSubPages(category)
   assert.equal(categoryProps, expectedRejectedPageData)
@@ -102,19 +101,19 @@ test('reject sub pages', () => {
   // assert.equal(categoryPropsB, expectedRejectedPageData)
 })
 
-test('walk from partial path', () => {
+TestNotionCMS('walk from partial path', () => {
   const test = []
-  testCMS.walk(node => test.push(node.name), '/products/category')
+  testCMS.walk((node: PageContent) => test.push(node.name), '/products/category')
   assert.equal(test, ['Product B', 'Product A'])
 })
 
-test('async walk from partial path', async () => {
+TestNotionCMS('async walk from partial path', async () => {
   const test = []
-  await testCMS.asyncWalk(async node => await setTimeout(test.push(node.name), 300), '/products/category')
+  await testCMS.asyncWalk(async (node: PageContent) => await setTimeout(test.push(node.name), 300), '/products/category')
   assert.equal(test, ['Product B', 'Product A'])
 })
 
-test('import', async () => {
+TestNotionCMS('import', async () => {
   assert.equal(
     await testCMS.import(JSON.stringify({
       metadata: {
@@ -135,7 +134,7 @@ test('import', async () => {
   )
 })
 
-test('import fails', async () => {
+TestNotionCMS('import fails', async () => {
   try {
     await testCMS.import()
     assert.unreachable('should have thrown')
@@ -144,5 +143,3 @@ test('import fails', async () => {
     assert.instance(err, Error)
   }
 })
-
-test.run()
