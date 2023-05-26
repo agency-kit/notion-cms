@@ -48,7 +48,7 @@
     "build:dts": "rm -rf dist && tsc --project ./tsconfig.json && rollup -c && npm run dts",
     "dts": "dts-bundle-generator -o index.d.ts src/index.ts --no-check && rm -rf .tmp",
     "test": "NODE_OPTIONS='--enable-source-maps' npx c8 uvu test",
-    "build:test": "npm run build && npm run test",
+    "build:test": "npm run build:dts && npm run test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "release": "changeset publish"

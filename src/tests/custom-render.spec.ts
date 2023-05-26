@@ -1,14 +1,18 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import { suite } from 'uvu'
 import * as assert from 'uvu/assert'
 import dotenv from 'dotenv'
-import NotionCMS, { NotionBlocksParser, blocksRenderPlugin } from '../dist/index.mjs'
+import type { Block } from '@notion-stuff/v4-types'
+import NotionCMS, { NotionBlocksParser, blocksRenderPlugin } from '../../dist/index.mjs'
+import type { Content, PageContent } from '../types'
 
 import {
   expectedKitchenSinkSiteData,
   expectedRoutes,
   expectedSiteData,
   expectedTags,
-} from './notion-api-mock.spec.mjs'
+} from './notion-api-mock.spec'
 
 dotenv.config()
 
@@ -16,22 +20,23 @@ dotenv.config()
 const databaseId = '21608fc7-c1c5-40a1-908f-9ade89585111'
 const notionAPIKey = process.env.NOTION
 
-let PluginsDefaultCMS,
-  PluginsDefaultOtherCMS,
-  PluginsCustomCMS,
-  PluginsCustomFallbackCMS
+let PluginsDefaultCMS: NotionCMS,
+  PluginsDefaultOtherCMS: NotionCMS,
+  PluginsCustomCMS: NotionCMS,
+  PluginsCustomFallbackCMS: NotionCMS
 
 // Helper Function for parsing internal block rich text
+// eslint-disable-next-line jest/unbound-method
 const parseRichText = NotionBlocksParser.parseRichText
 
 // temporarily ignore md and plaintext versions of content
-function filterContent(content) {
+function filterContent(content: Content) {
   delete content.plaintext
   delete content.markdown
   return content
 }
 
-const PluginsDefault = suite('PluginsDefault')
+export const PluginsDefault = suite('PluginsDefault')
 
 PluginsDefault.before(async () => {
   PluginsDefaultCMS = new NotionCMS({
@@ -41,7 +46,7 @@ PluginsDefault.before(async () => {
     // No Plugins - use default renderer plugin behind the scenes
   })
   await PluginsDefaultCMS.fetch()
-  PluginsDefaultCMS.walk(node => filterContent(node.content))
+  PluginsDefaultCMS.walk((node: PageContent) => filterContent(node.content))
 })
 
 // routes
@@ -60,7 +65,7 @@ PluginsDefault('siteData', () => {
   assert.equal(PluginsDefaultCMS.cms.siteData, expectedSiteData)
 })
 
-const PluginsDefaultOther = suite('PluginsDefaultOther')
+export const PluginsDefaultOther = suite('PluginsDefaultOther')
 
 PluginsDefaultOther.before(async () => {
   PluginsDefaultOtherCMS = new NotionCMS({
@@ -71,11 +76,11 @@ PluginsDefaultOther.before(async () => {
     plugins: [() => ({
       name: 'ncms-placeholder-plugin',
       hook: 'post-parse',
-      exec: block => block,
+      exec: (block: Block) => block,
     })],
   })
   await PluginsDefaultOtherCMS.fetch()
-  PluginsDefaultOtherCMS.walk(node => filterContent(node.content))
+  PluginsDefaultOtherCMS.walk((node: PageContent) => filterContent(node.content))
 })
 
 // routes
@@ -94,7 +99,7 @@ PluginsDefaultOther('siteData', () => {
   assert.equal(PluginsDefaultOtherCMS.cms.siteData, expectedSiteData)
 })
 
-const PluginsCustom = suite('PluginsCustom')
+export const PluginsCustom = suite('PluginsCustom')
 
 PluginsCustom.before(async () => {
   PluginsCustomCMS = new NotionCMS({
@@ -105,26 +110,30 @@ PluginsCustom.before(async () => {
     plugins: [() => ({
       name: 'ncms-placeholder-plugin',
       hook: 'post-parse',
-      exec: block => block,
+      exec: (block: Block) => block,
     }),
     // use custom renderer plugin behind the scenes
     blocksRenderPlugin({
       blockRenderers: {
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions, @typescript-eslint/no-unsafe-member-access
         CalloutBlock: block => `<div ncms-test callout>${parseRichText(block.callout.rich_text)}</div ncms-test callout>\n\n`,
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions, @typescript-eslint/no-unsafe-member-access
         QuoteBlock: block => `<div ncms-test quote>${parseRichText(block.quote.rich_text)}</div ncms-test quote>\n\n`,
       },
     })],
   })
   await PluginsCustomCMS.fetch()
-  PluginsCustomCMS.walk(node => filterContent(node.content))
+  PluginsCustomCMS.walk((node: PageContent) => filterContent(node.content))
 })
 
 PluginsCustom('Custom render correctly alters blocks', () => {
-  assert.ok(PluginsCustomCMS.data['/kitchen-sink'].content.html.match(/<div ncms-test callout>([.|\s\S]*)<\/div ncms-test callout>/g))
-  assert.ok(PluginsCustomCMS.data['/kitchen-sink'].content.html.match(/<div ncms-test quote>([.|\s\S]*)<\/div ncms-test quote>/g))
+  assert.ok((PluginsCustomCMS.data['/kitchen-sink'] as PageContent)
+    .content.html.match(/<div ncms-test callout>([.|\s\S]*)<\/div ncms-test callout>/g))
+  assert.ok((PluginsCustomCMS.data['/kitchen-sink'] as PageContent)
+    .content.html.match(/<div ncms-test quote>([.|\s\S]*)<\/div ncms-test quote>/g))
 })
 
-const PluginsCustomFallback = suite('PluginsCustomFallback')
+export const PluginsCustomFallback = suite('PluginsCustomFallback')
 
 PluginsCustomFallback.before(async () => {
   PluginsCustomFallbackCMS = new NotionCMS({
@@ -136,20 +145,16 @@ PluginsCustomFallback.before(async () => {
       // use custom renderer plugin behind the scenes
       blocksRenderPlugin({
         blockRenderers: {
-          CalloutBlock: block => null, // Nulls should invoke default renderer
-          QuoteBlock: block => null, // Nulls should invoke default renderer
+          CalloutBlock: (block: Block) => null, // Nulls should invoke default renderer
+          QuoteBlock: (block: Block) => null, // Nulls should invoke default renderer
         },
       })],
   })
   await PluginsCustomFallbackCMS.fetch()
-  PluginsCustomFallbackCMS.walk(node => filterContent(node.content))
+  PluginsCustomFallbackCMS.walk((node: PageContent) => filterContent(node.content))
 })
 
 PluginsCustomFallback('Custom render correctly uses fallback block renderer ', () => {
-  assert.equal(PluginsCustomFallbackCMS.cms.siteData['/kitchen-sink'].content.html, expectedKitchenSinkSiteData['/kitchen-sink'].content.html)
+  assert.equal((PluginsCustomFallbackCMS.cms.siteData['/kitchen-sink'] as PageContent)
+    .content.html, (expectedKitchenSinkSiteData['/kitchen-sink'] as PageContent).content.html)
 })
-
-PluginsDefault.run()
-PluginsDefaultOther.run()
-PluginsCustom.run()
-PluginsCustomFallback.run()
