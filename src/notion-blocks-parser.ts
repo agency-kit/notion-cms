@@ -9,6 +9,7 @@ import type {
   FileBlock,
   HeadingBlock,
   ImageBlock,
+  LinkToPageBlock,
   NumberedListItemBlock,
   PDFBlock,
   ParagraphBlock,
@@ -31,6 +32,7 @@ const blockRenderers = z.object({
   FileBlock: z.function().returns(z.string()),
   HeadingBlock: z.function().returns(z.string()),
   ImageBlock: z.function().returns(z.string()),
+  LinkToPageBlock: z.function().returns(z.string()),
   NumberedListItemBlock: z.function().returns(z.string()),
   ParagraphBlock: z.function().returns(z.string()),
   PDFBlock: z.function().returns(z.string()),
@@ -102,6 +104,11 @@ export default class NotionBlocksParser {
       blockRenderers?.BulletedListItemBlock,
       this.mdParser.parseBulletedListItems.bind(this.mdParser) as Renderer,
     ) as (block: BulletedListItemBlock) => string
+
+    this.mdParser.parseLinkToPageBlock = modularize(
+      blockRenderers?.LinkToPageBlock,
+      this.mdParser.parseLinkToPageBlock.bind(this.mdParser) as Renderer,
+    ) as (block: LinkToPageBlock) => string
 
     this.mdParser.parseNumberedListItems = modularize(
       blockRenderers?.NumberedListItemBlock,
