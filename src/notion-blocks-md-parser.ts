@@ -14,6 +14,7 @@ import type {
   FileWithCaption,
   HeadingBlock,
   ImageBlock,
+  LinkToPageBlock,
   NumberedListItemBlock,
   PDFBlock,
   ParagraphBlock,
@@ -26,6 +27,7 @@ import type {
   ToggleBlock,
   VideoBlock,
 } from '@notion-stuff/v4-types'
+import { uuidToId } from 'notion-utils'
 
 const EOL_MD = '\n'
 
@@ -113,6 +115,9 @@ export default class NotionBlocksMarkdownParser {
 
         if (childBlock.type === 'pdf')
           markdown += this.parsePdfBlock(childBlock).concat(childBlockString)
+
+        if (childBlock.type === 'link_to_page')
+          markdown += this.parseLinkToPageBlock(childBlock).concat(childBlockString)
 
         if (childBlock.type === 'divider')
           markdown += EOL_MD.concat('---', EOL_MD, childBlockString)
@@ -309,6 +314,16 @@ ${(codeBlock.code.rich_text[0] as RichTextText).text.content}
       equation.annotations,
       `$${equation.equation.expression}$`,
     )
+  }
+
+  parseLinkToPageBlock(linkToPage: LinkToPageBlock) {
+    const link = linkToPage.link_to_page as {
+      type: 'page_id'
+      page_id: string
+    }
+    const id = uuidToId(link.page_id)
+    // These will get replaced if ncms-plugin-linker is used.
+    return `<a href="/${id}">/${id}</a>`
   }
 
   parseFile(file: ExternalFileWithCaption | FileWithCaption): {

@@ -36,6 +36,7 @@ import {
   slugify,
   writeFile,
 } from './utilities'
+import NotionLogger from './notion-logger'
 
 import renderer from './plugins/render'
 
@@ -68,6 +69,7 @@ export default class NotionCMS {
   plugins: Array<Plugin | UnsafePlugin> | undefined
   private timer: number
   private coreRenderer: UnsafePlugin
+  private logger: NotionLogger
 
   constructor({
     databaseId,
@@ -91,7 +93,8 @@ export default class NotionCMS {
         databaseId,
         rootUrl: rootUrl || '',
         stats: {
-          duration: 0,
+          durationSeconds: 0,
+          totalPages: 0,
         },
       },
       stages: [],
@@ -100,18 +103,21 @@ export default class NotionCMS {
       tagGroups: {},
       siteData: {},
     }
-    this.cmsId = databaseId
+    this.cmsId = this._produceCMSIdentifier(databaseId)
+    this.debug = debug
+    this.logger = new NotionLogger({ debug: this.debug })
+
     this.notionClient = new Client({
       auth: notionAPIKey,
-      ...(debug && { logLevel: LogLevel.DEBUG }),
+      logLevel: LogLevel.DEBUG,
+      logger: this.logger.log.bind(this.logger),
     })
     this.refreshTimeout
       = (refreshTimeout && _.isString(refreshTimeout)) ? (humanInterval(refreshTimeout) || refreshTimeout) : 0
     this.draftMode = draftMode || false
     this.localCacheDirectory = localCacheDirectory
-    this.defaultCacheFilename = 'cache.json'
+    this.defaultCacheFilename = `ncms-cache-${this.cmsId}.json`
     this.localCacheUrl = path.resolve(__dirname, this.localCacheDirectory + this.defaultCacheFilename)
-    this.debug = debug
     this.limiter = limiter
     this.limiter.schedule.bind(limiter)
 
@@ -133,6 +139,10 @@ export default class NotionCMS {
         routes.push(node.path)
     })
     return routes
+  }
+
+  _produceCMSIdentifier(id: string): string {
+    return id.slice(-4)
   }
 
   _dedupePlugins(plugins: Array<Plugin | UnsafePlugin>): Array<Plugin | UnsafePlugin> {
@@ -204,7 +214,17 @@ export default class NotionCMS {
   static _isPageContentObject(node: WalkNode): boolean {
     return typeof node.key === 'string' && node?.key?.startsWith('/')
       && ((typeof node?.parent?.key === 'string' && node?.parent?.key?.startsWith('/'))
-        || !node?.parent?.key)
+        || !node?.parent?.key || node?.parent?.key === 'siteData')
+  }
+
+  static _createCMSWalker(cb: (node: PageContent) => void): WalkBuilder {
+    return new WalkBuilder()
+      .withCallback({
+        filters: [(node: WalkNode) => NotionCMS._isPageContentObject(node)],
+        nodeTypeFilters: ['object'],
+        positionFilter: 'postWalk',
+        callback: (node: WalkNode) => cb(node.val as PageContent),
+      })
   }
 
   _getParentPageId(response: PageObjectResponse): string {
@@ -389,6 +409,8 @@ export default class NotionCMS {
     }
     if (!db)
       return
+
+    stateWithDb.metadata.stats.totalPages = db.length
     stateWithDb.siteData = this._notionListToTree(
       _(db)
         // @ts-expect-error filter
@@ -468,7 +490,11 @@ export default class NotionCMS {
         this.export()
     }
     this.cms.routes = this.routes
-    this.cms.metadata.stats.duration = (Date.now() - this.timer) / 1000 // duration in seconds
+    this.cms.metadata.stats = {
+      ...this.logger.stats,
+      totalPages: this.cms.metadata.stats.totalPages,
+      durationSeconds: (Date.now() - this.timer) / 1000,
+    }
     if (this.debug)
       writeFile('debug/site-data.json', JSONStringifyWithFunctions(this.cms))
     return this.cms

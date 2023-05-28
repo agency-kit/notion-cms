@@ -29,11 +29,12 @@ export interface Options {
   plugins?: Array<Plugin | UnsafePlugin>
 }
 
-interface Stats {
-  duration: number
-  totalAPICalls?: number
-  failedCalls?: number
-  totalPages?: number
+export interface Stats {
+  durationSeconds: number
+  totalAPICalls: number
+  succeededCalls: number
+  failedCalls: number
+  totalPages: number
 }
 
 export interface Content {
@@ -48,7 +49,7 @@ export interface CMS {
   metadata: {
     rootUrl?: string | URL | undefined
     databaseId: string
-    stats: Stats
+    stats: Partial<Stats>
   }
   routes: Array<string | Array<string>>
   tags: Array<string>
