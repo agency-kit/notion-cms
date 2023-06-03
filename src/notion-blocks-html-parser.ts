@@ -34,6 +34,8 @@ export default class NotionBlocksHtmlParser {
       extensions: [gfmHeadingId({ prefix: '' })],
     }
     marked.use({ silent: true })
+    // This is a workaround so that hljs doesn't complain about mermaid not being a registered lang.
+    hljs.registerAliases('mermaid', { languageName: 'plaintext' })
   }
 
   marked(md: string): string {
@@ -52,7 +54,11 @@ export default class NotionBlocksHtmlParser {
   }
 
   _highlight(code: string, lang: string | undefined): string {
-    const language = (lang && hljs.getLanguage(lang)) ? lang : 'plaintext'
+    let language
+    if (lang === 'mermaid')
+      language = 'mermaid'
+    else
+      language = (lang && hljs.getLanguage(lang)) ? lang : 'plaintext'
     const higlighted = hljs.highlight(code, { language })
     const langClass = `language-${
       (!language || language.includes('plain')) ? 'none' : language}`

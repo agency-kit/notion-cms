@@ -143,3 +143,33 @@ TestNotionCMS('import fails', async () => {
     assert.instance(err, Error)
   }
 })
+
+TestNotionCMS('Options have changed', () => {
+  const options = {
+    databaseId,
+    notionAPIKey: process.env.NOTION,
+    draftMode: true,
+    plugins: [() => 'test plugin'],
+  }
+
+  const otherOptions = {
+    databaseId,
+    notionAPIKey: process.env.NOTION,
+    draftMode: true,
+    plugins: [() => 'test plugin'],
+  }
+
+  const newOptions = {
+    databaseId,
+    notionAPIKey: process.env.NOTION,
+    draftMode: false,
+  }
+
+  const testOptionsCMS: NotionCMS = new NotionCMS(options)
+
+  assert.ok(
+    testOptionsCMS._documentOptions(options) === testOptionsCMS._documentOptions(otherOptions))
+
+  assert.not(
+    testOptionsCMS._documentOptions(options) === testOptionsCMS._documentOptions(newOptions))
+})
