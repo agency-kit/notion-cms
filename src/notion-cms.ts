@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
 import { Client, LogLevel, collectPaginatedAPI, isFullBlock, isFullPage } from '@notionhq/client'
 import type {
   BlockObjectResponse,
@@ -37,7 +38,6 @@ import {
   writeFile,
 } from './utilities'
 import NotionLogger from './notion-logger'
-
 import renderer from './plugins/render'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -67,6 +67,7 @@ export default class NotionCMS {
   debug: boolean | undefined
   limiter: { schedule: Function }
   plugins: Array<Plugin | UnsafePlugin> | undefined
+  options: Options
   private timer: number
   private coreRenderer: UnsafePlugin
   private logger: NotionLogger
@@ -88,8 +89,20 @@ export default class NotionCMS {
     plugins = [],
   }: Options = { databaseId: '', notionAPIKey: '' }) {
     this.timer = Date.now()
+    this.options = {
+      databaseId,
+      notionAPIKey,
+      debug,
+      draftMode,
+      refreshTimeout,
+      localCacheDirectory,
+      rootUrl,
+      limiter,
+      plugins,
+    }
     this.cms = {
       metadata: {
+        options: this._documentOptions(this.options),
         databaseId,
         rootUrl: rootUrl || '',
         stats: {
@@ -139,6 +152,25 @@ export default class NotionCMS {
         routes.push(node.path)
     })
     return routes
+  }
+
+  _documentOptions(options: Options): string {
+    let hex
+    try {
+      const tempOptions = _.cloneDeep(options)
+      delete tempOptions.limiter
+      const hasher = createHash('md5')
+      // Detecting Function string differences needs
+      // to be implemented using the JSONStringifyWithFunctions util.
+      const json = JSON.stringify(tempOptions)
+      hasher.update(json)
+      hex = hasher.digest('hex')
+    }
+    catch (e) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`Failed to document options object: ${e}`)
+    }
+    return hex
   }
 
   _produceCMSIdentifier(id: string): string {
@@ -455,10 +487,11 @@ export default class NotionCMS {
   }
 
   async fetch(): Promise<CMS> {
-    let cachedCMS
+    let cachedCMS, optionsHaveChanged
     if (fs.existsSync(this.localCacheUrl)) {
       try {
         cachedCMS = JSONParseWithFunctions(fs.readFileSync(this.localCacheUrl, 'utf-8')) as CMS
+        optionsHaveChanged = cachedCMS.metadata.options === this.cms.metadata.options
       }
       catch (e) {
         if (this.debug)
@@ -466,8 +499,9 @@ export default class NotionCMS {
       }
     }
     // Use refresh time to see if we should return local env cache or fresh api calls from Notion
-    if (cachedCMS && cachedCMS.lastUpdateTimestamp
-      && Date.now() < (cachedCMS.lastUpdateTimestamp + _.toNumber(this.refreshTimeout))) {
+    if (cachedCMS && ((cachedCMS.lastUpdateTimestamp
+        && (Date.now() < cachedCMS.lastUpdateTimestamp + _.toNumber(this.refreshTimeout)))
+          && !optionsHaveChanged)) {
       if (this.debug)
         console.log('using cache')
       this.cms = cachedCMS

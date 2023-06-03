@@ -47,6 +47,7 @@ export interface CMS {
   stages: Array<string>
   lastUpdateTimestamp?: number
   metadata: {
+    options?: string
     rootUrl?: string | URL | undefined
     databaseId: string
     stats: Partial<Stats>
