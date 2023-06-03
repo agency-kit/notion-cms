@@ -1,5 +1,13 @@
 # @agency-kit/notion-cms
 
+## 0.7.1
+
+### Patch Changes
+
+- 521cc9e: Upd: Support mermaid as a highlight js lang.
+
+  Upd: Support detection of changes in options to trigger a re-fetch, not including functions.
+
 ## 0.7.0
 
 ### Minor Changes
