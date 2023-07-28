@@ -1,5 +1,13 @@
 # @agency-kit/notion-cms
 
+## 0.7.2
+
+### Patch Changes
+
+- f493c16: Fix: Caching was broken by a typo in the options checking mechanism in last release.
+
+  Fix: Make sure that the refresh timeout gets set properly whether a number or string is used.
+
 ## 0.7.1
 
 ### Patch Changes
