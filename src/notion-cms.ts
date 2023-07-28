@@ -126,7 +126,9 @@ export default class NotionCMS {
       logger: this.logger.log.bind(this.logger),
     })
     this.refreshTimeout
-      = (refreshTimeout && _.isString(refreshTimeout)) ? (humanInterval(refreshTimeout) || refreshTimeout) : 0
+      = (refreshTimeout && _.isString(refreshTimeout))
+        ? (humanInterval(refreshTimeout) || refreshTimeout)
+        : (refreshTimeout || 0)
     this.draftMode = draftMode || false
     this.localCacheDirectory = localCacheDirectory
     this.defaultCacheFilename = `ncms-cache-${this.cmsId}.json`
@@ -491,7 +493,7 @@ export default class NotionCMS {
     if (fs.existsSync(this.localCacheUrl)) {
       try {
         cachedCMS = JSONParseWithFunctions(fs.readFileSync(this.localCacheUrl, 'utf-8')) as CMS
-        optionsHaveChanged = cachedCMS.metadata.options === this.cms.metadata.options
+        optionsHaveChanged = cachedCMS.metadata.options !== this.cms.metadata.options
       }
       catch (e) {
         if (this.debug)

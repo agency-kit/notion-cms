@@ -173,3 +173,14 @@ TestNotionCMS('Options have changed', () => {
   assert.not(
     testOptionsCMS._documentOptions(options) === testOptionsCMS._documentOptions(newOptions))
 })
+
+TestNotionCMS('Human readable refresh timeout', () => {
+  const testOptionsCMS: NotionCMS = new NotionCMS({
+    databaseId,
+    notionAPIKey: process.env.NOTION,
+    draftMode: true,
+    refreshTimeout: 'one hour',
+  })
+  assert.ok(
+    testOptionsCMS.refreshTimeout === 3_600_000)
+})
