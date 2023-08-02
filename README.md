@@ -4,6 +4,8 @@
 
 Turn Notion into a full-fledged Headless CMS with this utility set.
 
+> ### Check out our new WIP docs site: https://notion-cms-docs.netlify.app/guide/
+
 🌲  Build a collection-based CMS tree from your Notion database.  
 🎚️  Leverage database sub-items.  
 ⚙️   Geared for Static Site Generation with Notion markdown -> HTML output.  
