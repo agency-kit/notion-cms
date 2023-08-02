@@ -1,5 +1,17 @@
 # @agency-kit/notion-cms
 
+## 0.8.0
+
+### Minor Changes
+
+- d60bd35: Upd: No longer support cjs.
+
+  New: Support rendering link preview blocks.
+
+  New: Add a loading spinner that reports to the terminal for some feedback.
+
+  Upd: Alias `fetch` at `pull` which will match future `push` commands better.
+
 ## 0.7.2
 
 ### Patch Changes
