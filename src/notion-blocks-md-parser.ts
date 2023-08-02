@@ -14,6 +14,7 @@ import type {
   FileWithCaption,
   HeadingBlock,
   ImageBlock,
+  LinkPreviewBlock,
   LinkToPageBlock,
   NumberedListItemBlock,
   PDFBlock,
@@ -122,9 +123,18 @@ export default class NotionBlocksMarkdownParser {
         if (childBlock.type === 'divider')
           markdown += EOL_MD.concat('---', EOL_MD, childBlockString)
 
+        if (childBlock.type === 'link_preview')
+          markdown += this.parseLinkPreview(childBlock).concat(childBlockString)
+
         return markdown
       }, '')
       .concat(EOL_MD)
+  }
+
+  parseLinkPreview(linkPreviewBlock: LinkPreviewBlock): string {
+    return `<div notion-link-preview>
+      <a href="${linkPreviewBlock.link_preview.url}">${linkPreviewBlock.link_preview.url}</a>
+    </div>\n\n`
   }
 
   parseParagraph(paragraphBlock: ParagraphBlock): string {

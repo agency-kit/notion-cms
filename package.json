@@ -1,5 +1,6 @@
 {
   "name": "@agency-kit/notion-cms",
+  "type": "module",
   "version": "0.7.2",
   "description": "Turn Notion into a headless content management system with this utility set.",
   "author": "Jacob Milhorn",
@@ -33,12 +34,7 @@
     "framework agnostic",
     "agnostic"
   ],
-  "exports": {
-    "require": "./dist/index.js",
-    "default": "./dist/index.mjs"
-  },
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
   "types": "./index.d.ts",
   "scripts": {
     "dev": "tsc --watch",
@@ -54,6 +50,7 @@
     "release": "changeset publish"
   },
   "dependencies": {
+    "@clack/prompts": "^0.6.3",
     "@notionhq/client": "^2.2.3",
     "flatted": "^3.2.7",
     "highlight.js": "^11.7.0",

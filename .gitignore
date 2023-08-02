@@ -8,3 +8,4 @@ coverage/
 my.secrets
 .tmp/
 test/
+*.tgz

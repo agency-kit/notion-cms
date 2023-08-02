@@ -4,7 +4,7 @@ import { setTimeout } from 'node:timers/promises'
 import dotenv from 'dotenv'
 import { suite } from 'uvu'
 import * as assert from 'uvu/assert'
-import NotionCMS from '../../dist/index.mjs'
+import NotionCMS from '../../dist/index.js'
 
 import type { Content, PageContent } from '../types'
 
@@ -29,7 +29,7 @@ const testCMS: NotionCMS = new NotionCMS({
   draftMode: true,
 })
 
-await testCMS.fetch()
+await testCMS.pull()
 
 // temporarily ignore md and plaintext versions of content
 function filterContent(content: Content) {

@@ -4,7 +4,7 @@ import { suite } from 'uvu'
 import * as assert from 'uvu/assert'
 import dotenv from 'dotenv'
 import type { Block } from '@notion-stuff/v4-types'
-import NotionCMS, { NotionBlocksParser, blocksRenderPlugin } from '../../dist/index.mjs'
+import NotionCMS, { NotionBlocksParser, blocksRenderPlugin } from '../../dist/index.js'
 import type { Content, PageContent } from '../types'
 
 import {
