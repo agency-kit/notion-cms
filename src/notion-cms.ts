@@ -13,6 +13,7 @@ import _ from 'lodash'
 import type { AsyncCallbackFn, WalkNode } from 'walkjs'
 import { AsyncWalkBuilder, WalkBuilder } from 'walkjs'
 import humanInterval from 'human-interval'
+import { spinner } from '@clack/prompts'
 import type {
   CMS,
   Content,
@@ -55,6 +56,8 @@ const STEADY_PROPS = [
   'sub-page',
 ]
 
+const clackSpinner = spinner()
+
 export default class NotionCMS {
   cms: CMS
   cmsId: string
@@ -71,6 +74,7 @@ export default class NotionCMS {
   private timer: number
   private coreRenderer: UnsafePlugin
   private logger: NotionLogger
+  pull: Function
 
   constructor({
     databaseId,
@@ -139,6 +143,7 @@ export default class NotionCMS {
     this.coreRenderer = renderer({ blockRenderers: {}, debug })
     this.coreRenderer.name = 'core-renderer'
     this.plugins = this._dedupePlugins([...plugins, this.coreRenderer])
+    this.pull = this.fetch.bind(this)
   }
 
   get data() {
@@ -511,6 +516,7 @@ export default class NotionCMS {
     else {
       if (this.debug)
         console.log('using API')
+      clackSpinner.start('🛸 ncms: pulling your content from Notion...')
       if (!_.includes(this.cms.stages, 'db')) {
         const cmsOutput = await this._getDb(this.cms)
         if (!cmsOutput)
@@ -524,6 +530,7 @@ export default class NotionCMS {
       }
       if (_.includes(this.cms.stages, 'complete'))
         this.export()
+      clackSpinner.stop('ncms: mission complete! 👽')
     }
     this.cms.routes = this.routes
     this.cms.metadata.stats = {

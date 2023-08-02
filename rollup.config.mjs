@@ -5,16 +5,14 @@ export default [{
   input: 'src/index.ts',
   plugins: [esbuild()],
   output: [
-    { format: 'esm', file: './dist/index.mjs' },
-    { format: 'cjs', file: './dist/index.js' },
+    { format: 'esm', file: './dist/index.js' },
   ],
 },
 {
   input: 'src/index.ts',
   plugins: [esbuild({ sourceMap: true }), terser()],
   output: [
-    { format: 'esm', file: './dist/index.min.mjs', sourcemap: 'inline' },
-    { format: 'cjs', file: './dist/index.min.js', sourcemap: 'inline' },
+    { format: 'esm', file: './dist/index.min.js', sourcemap: 'inline' },
   ],
 },
 {

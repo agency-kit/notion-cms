@@ -5,7 +5,7 @@ import Bottleneck from 'bottleneck'
 import dotenv from 'dotenv'
 import { suite } from 'uvu'
 import * as assert from 'uvu/assert'
-import NotionCMS from '../../dist/index.mjs'
+import NotionCMS from '../../dist/index.js'
 
 import type { Content, PageContent } from '../types'
 import {

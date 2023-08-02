@@ -9,6 +9,7 @@ import type {
   FileBlock,
   HeadingBlock,
   ImageBlock,
+  LinkPreviewBlock,
   LinkToPageBlock,
   NumberedListItemBlock,
   PDFBlock,
@@ -44,6 +45,7 @@ const blockRenderers = z.object({
   ToDoBlock: z.function().returns(z.string()),
   ToggleBlock: z.function().returns(z.string()),
   VideoBlock: z.function().returns(z.string()),
+  LinkPreviewBlock: z.function().returns(z.string()),
 }).partial()
 
 export type BlockRenderers = z.infer<typeof blockRenderers>
@@ -149,6 +151,11 @@ export default class NotionBlocksParser {
       blockRenderers?.PDFBlock,
       this.mdParser.parsePdfBlock.bind(this.mdParser) as Renderer,
     ) as (block: PDFBlock) => string
+
+    this.mdParser.parseLinkPreview = modularize(
+      blockRenderers?.LinkPreviewBlock,
+      this.mdParser.parseLinkPreview.bind(this.mdParser) as Renderer,
+    ) as (block: LinkPreviewBlock) => string
 
     // Warning: this parser is used in many of the other parsers internally.
     // Modding it could affect the others unexpectedly.
