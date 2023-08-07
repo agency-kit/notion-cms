@@ -18,6 +18,7 @@ import type {
   CMS,
   Content,
   Cover,
+  ExtendedPageContent,
   FlatListItem,
   Options,
   Page,
@@ -75,6 +76,7 @@ export default class NotionCMS {
   private coreRenderer: UnsafePlugin
   private logger: NotionLogger
   pull: Function
+  rootAlias: string
 
   constructor({
     databaseId,
@@ -83,6 +85,7 @@ export default class NotionCMS {
     draftMode = false,
     refreshTimeout = 0,
     localCacheDirectory = './.notion-cms/',
+    rootAlias = '',
     rootUrl = '',
     limiter = {
       schedule: (func: Function) => {
@@ -144,6 +147,7 @@ export default class NotionCMS {
     this.coreRenderer.name = 'core-renderer'
     this.plugins = this._dedupePlugins([...plugins, this.coreRenderer])
     this.pull = this.fetch.bind(this)
+    this.rootAlias = rootAlias
   }
 
   get data() {
@@ -233,6 +237,8 @@ export default class NotionCMS {
     for (const item of flatList) {
       const parentId = item[parentIdPath]
       if (isRoot(item)) {
+        if (item._key === this.rootAlias)
+          item._key = '/'
         rootParents.push(item)
       }
       else {
@@ -256,13 +262,13 @@ export default class NotionCMS {
         || !node?.parent?.key || node?.parent?.key === 'siteData')
   }
 
-  static _createCMSWalker(cb: (node: PageContent) => void): WalkBuilder {
+  static _createCMSWalker(cb: (node: ExtendedPageContent) => void): WalkBuilder {
     return new WalkBuilder()
       .withCallback({
         filters: [(node: WalkNode) => NotionCMS._isPageContentObject(node)],
         nodeTypeFilters: ['object'],
         positionFilter: 'postWalk',
-        callback: (node: WalkNode) => cb(node.val as PageContent),
+        callback: (node: WalkNode) => cb(node.val as ExtendedPageContent),
       })
   }
 
@@ -476,7 +482,10 @@ export default class NotionCMS {
           const update = this._getPageUpdate(value._notion as PageObjectResponse)
           _.assign(value, update)
           _.assign(value, {
-            path: node.getPath(node => `${node.key as string}`).replace('siteData', ''),
+            // Replace double // so that root aliasing works properly
+            path: node.getPath(node => `${node.key as string}`)
+              .replace('siteData', '')
+              .replace('//', '/'),
             url: (stateWithDb.metadata.rootUrl && value.path)
               ? (`stateWithDb.metadata.rootUrl as string ${value.path}`)
               : '',
@@ -603,6 +612,8 @@ export default class NotionCMS {
 
   queryByPath(path: string): Page {
     const segments = path.split('/').slice(1)
+    if (this.rootAlias && path !== '/')
+      segments.unshift('') // This lets us access the root aliased page.
     let access: Page = this.cms.siteData
     for (const segment of segments) {
       // @ts-expect-error-next-line
