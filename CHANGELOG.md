@@ -1,5 +1,13 @@
 # @agency-kit/notion-cms
 
+## 0.8.1
+
+### Patch Changes
+
+- 45151f6: New: add core plugins to repo: Images, Linker, Head.
+
+  New: add support for a root alias option that gets its key set to '/' route for convenience.
+
 ## 0.8.0
 
 ### Minor Changes
