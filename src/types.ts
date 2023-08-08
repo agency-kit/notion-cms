@@ -24,6 +24,7 @@ export interface Options {
   draftMode?: boolean
   refreshTimeout?: number | string // in ms or converted from human readable string
   localCacheDirectory?: string
+  rootAlias?: string
   rootUrl?: string | URL | undefined // Used to generate full path links,
   limiter?: { schedule: Function }
   plugins?: Array<Plugin | UnsafePlugin>
@@ -80,7 +81,11 @@ export interface Route {
   [key: string]: PageContent
 }
 
-export type Page = PageContent | (PageContent & Route)
+export type ExtendedPageContent = PageContent & {
+  [key: string]: unknown
+}
+
+export type Page = PageContent | (PageContent & Route) | ExtendedPageContent
 
 // Directly stolen from PageObjectResponse Record Type in notionClient/API-endpoints.ts
 export interface PageObjectTitle { type: 'title'; title: Array<RichTextItemResponse>; id: string }

@@ -52,14 +52,17 @@
   "dependencies": {
     "@clack/prompts": "^0.6.3",
     "@notionhq/client": "^2.2.3",
+    "file-type": "^18.5.0",
     "flatted": "^3.2.7",
     "highlight.js": "^11.7.0",
     "human-interval": "^2.0.1",
     "lodash": "^4.17.21",
     "marked": "^5.0.2",
     "marked-gfm-heading-id": "^3.0.3",
+    "nanoid": "^4.0.2",
     "notion-utils": "^6.16.0",
     "serialize-javascript": "^6.0.1",
+    "sharp": "^0.32.4",
     "walkjs": "^4.0.5",
     "zod": "^3.21.4"
   },
