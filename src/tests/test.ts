@@ -6,6 +6,7 @@ import {
   PluginsDefaultOther,
 } from './custom-render.spec'
 import { TestLimiter } from './limiter.spec'
+import { TestNotionCMSCache } from './notion-cms-caching.spec'
 
 TestNotionCMS.run()
 
@@ -15,3 +16,5 @@ PluginsDefault.run()
 PluginsDefaultOther.run()
 PluginsCustom.run()
 PluginsCustomFallback.run()
+
+TestNotionCMSCache.run()

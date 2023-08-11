@@ -4,7 +4,7 @@ import { suite } from 'uvu'
 import * as assert from 'uvu/assert'
 import dotenv from 'dotenv'
 import type { Block } from '@notion-stuff/v4-types'
-import NotionCMS, { NotionBlocksParser, blocksRenderPlugin } from '../../dist/index.js'
+import NotionCMS, { NotionBlocksParser, blocksRenderPlugin } from '../index'
 import type { Content, PageContent } from '../types'
 
 import {
@@ -45,6 +45,8 @@ PluginsDefault.before(async () => {
     draftMode: true,
     // No Plugins - use default renderer plugin behind the scenes
   })
+  console.log('custom render test: purging cache')
+  PluginsDefaultCMS.purgeCache()
   await PluginsDefaultCMS.fetch()
   PluginsDefaultCMS.walk((node: PageContent) => filterContent(node.content))
 })
@@ -79,6 +81,8 @@ PluginsDefaultOther.before(async () => {
       exec: (block: Block) => block,
     })],
   })
+  console.log('custom render test: purging cache')
+  PluginsDefaultOtherCMS.purgeCache()
   await PluginsDefaultOtherCMS.fetch()
   PluginsDefaultOtherCMS.walk((node: PageContent) => filterContent(node.content))
 })
@@ -115,13 +119,15 @@ PluginsCustom.before(async () => {
     // use custom renderer plugin behind the scenes
     blocksRenderPlugin({
       blockRenderers: {
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions, @typescript-eslint/no-unsafe-member-access
-        CalloutBlock: block => `<div ncms-test callout>${parseRichText(block.callout.rich_text)}</div ncms-test callout>\n\n`,
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions, @typescript-eslint/no-unsafe-member-access
-        QuoteBlock: block => `<div ncms-test quote>${parseRichText(block.quote.rich_text)}</div ncms-test quote>\n\n`,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        CalloutBlock: block => `<div ncms-test callout>${parseRichText(block.callout.rich_text as string)}</div ncms-test callout>\n\n`,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        QuoteBlock: block => `<div ncms-test quote>${parseRichText(block.quote.rich_text as string)}</div ncms-test quote>\n\n`,
       },
     })],
   })
+  console.log('custom render test: purging cache')
+  PluginsCustomCMS.purgeCache()
   await PluginsCustomCMS.fetch()
   PluginsCustomCMS.walk((node: PageContent) => filterContent(node.content))
 })
@@ -150,6 +156,8 @@ PluginsCustomFallback.before(async () => {
         },
       })],
   })
+  console.log('custom render test: purging cache')
+  PluginsCustomFallbackCMS.purgeCache()
   await PluginsCustomFallbackCMS.fetch()
   PluginsCustomFallbackCMS.walk((node: PageContent) => filterContent(node.content))
 })
