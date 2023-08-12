@@ -79,6 +79,7 @@ export default class NotionCMS {
   pull: () => Promise<CMS>
   rootAlias: string
   withinRefreshTimeout: boolean
+  quietMode: boolean
 
   constructor({
     databaseId,
@@ -90,6 +91,7 @@ export default class NotionCMS {
     localCacheDirectory = './.notion-cms/',
     rootAlias = '',
     rootUrl = '',
+    quiet = false,
     limiter = {
       schedule: (func: Function) => {
         const result = func() as unknown
@@ -105,10 +107,13 @@ export default class NotionCMS {
       debug,
       draftMode,
       refreshTimeout,
+      autoUpdate,
       localCacheDirectory,
       rootUrl,
+      rootAlias,
       limiter,
       plugins,
+      quiet,
     }
     this.cms = {
       metadata: {
@@ -153,6 +158,7 @@ export default class NotionCMS {
     this.pull = this.fetch.bind(this)
     this.rootAlias = rootAlias
     this.withinRefreshTimeout = false
+    this.quietMode = quiet
   }
 
   get data() {
@@ -370,6 +376,8 @@ export default class NotionCMS {
             return
           // Definitely grab content if there is no cache.
           if (pageContent._updateNeeded || !cachedState) {
+            if (!this.quietMode && pageContent.path)
+              console.log(`[updating]: ${pageContent.path}`)
             const blocks = await this._pullPageContent(pageContent._notion.id)
             if (!blocks)
               return
