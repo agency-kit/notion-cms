@@ -63,6 +63,7 @@ export default class NotionCMS {
   cms: CMS
   cmsId: string
   notionClient: Client
+  autoUpdate: boolean
   refreshTimeout: number | string
   draftMode: boolean
   defaultCacheFilename: string
@@ -75,8 +76,9 @@ export default class NotionCMS {
   private timer: number
   private coreRenderer: UnsafePlugin
   private logger: NotionLogger
-  pull: Function
+  pull: () => Promise<CMS>
   rootAlias: string
+  withinRefreshTimeout: boolean
 
   constructor({
     databaseId,
@@ -84,6 +86,7 @@ export default class NotionCMS {
     debug = false,
     draftMode = false,
     refreshTimeout = 0,
+    autoUpdate = true,
     localCacheDirectory = './.notion-cms/',
     rootAlias = '',
     rootUrl = '',
@@ -123,7 +126,7 @@ export default class NotionCMS {
       tagGroups: {},
       siteData: {},
     }
-    this.cmsId = this._produceCMSIdentifier(databaseId)
+    this.cmsId = this._produceCMSIdentifier(databaseId) // Can't have multiple instances that reference the same db.
     this.debug = debug
     this.logger = new NotionLogger({ debug: this.debug })
 
@@ -132,6 +135,7 @@ export default class NotionCMS {
       logLevel: LogLevel.DEBUG,
       logger: this.logger.log.bind(this.logger),
     })
+    this.autoUpdate = autoUpdate
     this.refreshTimeout
       = (refreshTimeout && _.isString(refreshTimeout))
         ? (humanInterval(refreshTimeout) || refreshTimeout)
@@ -148,6 +152,7 @@ export default class NotionCMS {
     this.plugins = this._dedupePlugins([...plugins, this.coreRenderer])
     this.pull = this.fetch.bind(this)
     this.rootAlias = rootAlias
+    this.withinRefreshTimeout = false
   }
 
   get data() {
@@ -210,7 +215,7 @@ export default class NotionCMS {
 
     let val = context
     for (const plugin of this.plugins.flat()) {
-      if (plugin.hook === hook) {
+      if (plugin.hook === hook || plugin.hook === '*') {
         // eslint-disable-next-line @typescript-eslint/await-thenable
         val = await plugin.exec(val, {
           debug: !!this.debug,
@@ -351,7 +356,7 @@ export default class NotionCMS {
     }
   }
 
-  async _getPageContent(state: CMS): Promise<CMS> {
+  async _getPageContent(state: CMS, cachedState?: CMS): Promise<CMS> {
     let stateWithContent = _.cloneDeep(state)
 
     await new AsyncWalkBuilder()
@@ -360,24 +365,42 @@ export default class NotionCMS {
         nodeTypeFilters: ['object'],
         positionFilter: 'postWalk',
         callback: async (node: WalkNode) => {
-          const value = node.val as PageContent
-          if (!value || !value?._notion?.id)
+          const pageContent = node.val as PageContent
+          if (!pageContent || !pageContent?._notion?.id)
             return
-          const blocks = await this._pullPageContent(value._notion.id)
-          if (!blocks)
-            return
-          const content = await this._parsePageContent(blocks)
-          _.assign(value, {
-            content,
-            ...(!value.coverImage && { coverImage: content.html.match(COVER_IMAGE_REGEX)?.[1] }),
-            _ancestors: this._gatherNodeAncestors(node),
-          })
+          // Definitely grab content if there is no cache.
+          if (pageContent._updateNeeded || !cachedState) {
+            const blocks = await this._pullPageContent(pageContent._notion.id)
+            if (!blocks)
+              return
+            const content = await this._parsePageContent(blocks)
+            _.assign(pageContent, {
+              content,
+              ...(!pageContent.coverImage && { coverImage: content.html.match(COVER_IMAGE_REGEX)?.[1] }),
+              _ancestors: this._gatherNodeAncestors(node),
+            })
+          }
+          else if (cachedState && pageContent.path) {
+            const cachedPage = this._queryByPath(pageContent.path, cachedState?.siteData)
+            if (cachedPage) {
+              _.assign(pageContent, {
+                content: cachedPage.content,
+                ...(!cachedPage.coverImage && { coverImage: cachedPage.content?.html.match(COVER_IMAGE_REGEX)?.[1] }),
+                _ancestors: this._gatherNodeAncestors(node),
+              })
+            }
+          }
+          else {
+            throw new Error(`ncms: error when updating page content. No page found for ${node.key || 'undetermined node key'}`)
+          }
+
           _.assign(
-            value,
-            await this._runPlugins(value, 'during-tree') as Page)
-          delete value.otherProps
+            pageContent,
+            await this._runPlugins(pageContent, 'during-tree') as Page)
+          delete pageContent.otherProps
           // We only want access to ancestors for plugins, otherwise it creates circular ref headaches.
-          delete value._ancestors
+          delete pageContent._ancestors
+          delete pageContent._updateNeeded
         },
       })
       .withRootObjectCallbacks(false)
@@ -437,7 +460,7 @@ export default class NotionCMS {
     }).compact().value()
   }
 
-  async _getDb(state: CMS): Promise<CMS | undefined> {
+  async _getDb(state: CMS, cachedState?: CMS): Promise<CMS | undefined> {
     let stateWithDb = _.cloneDeep(state)
     let db
     try {
@@ -464,7 +487,7 @@ export default class NotionCMS {
           _key: routify(this._getBlockName(page)),
           id: page.id,
           pid: this._getParentPageId(page),
-          _notion: page,
+          _notion: page, // this property is recycled to eventually house metadata.
         }))
         .value(),
     )
@@ -476,22 +499,28 @@ export default class NotionCMS {
       .withCallback({
         nodeTypeFilters: ['object'],
         callback: (node: WalkNode) => {
-          const value = node.val as PageContent
-          if (!value?._notion)
+          const pageContent = node.val as PageContent
+          if (!pageContent?._notion)
             return
-          const update = this._getPageUpdate(value._notion as PageObjectResponse)
-          _.assign(value, update)
-          _.assign(value, {
+          pageContent._updateNeeded = !this.withinRefreshTimeout
+          const update = this._getPageUpdate(pageContent._notion as PageObjectResponse)
+          _.assign(pageContent, update)
+          _.assign(pageContent, {
             // Replace double // so that root aliasing works properly
             path: node.getPath(node => `${node.key as string}`)
               .replace('siteData', '')
               .replace('//', '/'),
-            url: (stateWithDb.metadata.rootUrl && value.path)
-              ? (`stateWithDb.metadata.rootUrl as string ${value.path}`)
+            url: (stateWithDb.metadata.rootUrl && pageContent.path)
+              ? (`${stateWithDb.metadata.rootUrl as string}${pageContent.path}`)
               : '',
           })
-          if (node.key && typeof node.key === 'string' && value.tags && value.path)
-            this._buildTagGroups(value.tags, value.path, stateWithDb)
+          if (cachedState && pageContent.path && !this.withinRefreshTimeout) {
+            const cachedPage = this._queryByPath(pageContent.path, cachedState?.siteData)
+            pageContent._updateNeeded = this.autoUpdate
+              && (update._notion?.last_edited_time !== cachedPage?._notion?.last_edited_time)
+          }
+          if (node.key && typeof node.key === 'string' && pageContent.tags && pageContent.path)
+            this._buildTagGroups(pageContent.tags, pageContent.path, stateWithDb)
         },
       })
       .withRootObjectCallbacks(false)
@@ -514,33 +543,28 @@ export default class NotionCMS {
           console.error('Parsing cached CMS failed. Using API instead.')
       }
     }
-    // Use refresh time to see if we should return local env cache or fresh api calls from Notion
-    if (cachedCMS && ((cachedCMS.lastUpdateTimestamp
-        && (Date.now() < cachedCMS.lastUpdateTimestamp + _.toNumber(this.refreshTimeout)))
-          && !optionsHaveChanged)) {
-      if (this.debug)
-        console.log('using cache')
-      this.cms = cachedCMS
-    }
-    else {
-      if (this.debug)
-        console.log('using API')
-      clackSpinner.start('🛸 ncms: pulling your content from Notion...')
-      if (!_.includes(this.cms.stages, 'db')) {
-        const cmsOutput = await this._getDb(this.cms)
-        if (!cmsOutput)
-          throw new Error('NotionCMS Error: DB fetch unsuccessful.')
-        this.cms = cmsOutput
-      }
+    this.withinRefreshTimeout = Boolean(cachedCMS && ((cachedCMS.lastUpdateTimestamp
+      && (Date.now() < cachedCMS.lastUpdateTimestamp + _.toNumber(this.refreshTimeout)))
+        && !optionsHaveChanged))
 
-      if (!_.includes(this.cms.stages, 'content')) {
-        this.cms = await this._getPageContent(this.cms)
-        this.cms.stages.push('complete')
-      }
-      if (_.includes(this.cms.stages, 'complete'))
-        this.export()
+    clackSpinner.start('🛸 ncms: pulling your content from Notion...')
+    try {
+      const cmsOutput = await this._getDb(this.cms, cachedCMS)
+      if (!cmsOutput)
+        throw new Error('NotionCMS Error: DB fetch unsuccessful.')
+      this.cms = cmsOutput
+
+      this.cms = await this._getPageContent(this.cms, cachedCMS)
+      this.cms.stages.push('complete')
+      this.export()
       clackSpinner.stop('ncms: mission complete! 👽')
     }
+    catch (e) {
+      clackSpinner.stop('ncms: Something went wrong. Mission aborted.')
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      console.error(`ncms error: ${e}`)
+    }
+
     this.cms.routes = this.routes
     this.cms.metadata.stats = {
       ...this.logger.stats,
@@ -610,16 +634,20 @@ export default class NotionCMS {
       .fromPairs().value() as Page
   }
 
-  queryByPath(path: string): Page {
+  _queryByPath(path: string, siteData: Record<string, Page>): Page {
     const segments = path.split('/').slice(1)
     if (this.rootAlias && path !== '/')
       segments.unshift('') // This lets us access the root aliased page.
-    let access: Page = this.cms.siteData
+    let access: Page = siteData
     for (const segment of segments) {
       // @ts-expect-error-next-line
       access = access[`/${segment}`] as Page
     }
     return access
+  }
+
+  queryByPath(path: string): Page {
+    return this._queryByPath(path, this.cms.siteData)
   }
 
   export({ pretty = false, path = this.localCacheUrl }:
@@ -649,5 +677,20 @@ export default class NotionCMS {
     }
     const transformedPreviousState = await this._runPlugins(parsedPreviousState, 'import') as CMS
     return this.cms = transformedPreviousState
+  }
+
+  purgeCache(): boolean {
+    try {
+      fs.rmSync(this.localCacheUrl)
+    }
+    catch (e) {
+      if (this.debug)
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        console.log(`ncms: error when attempting to clear cache: ${e}`)
+      return false
+    }
+    if (this.debug)
+      console.log('ncms: cache has been successfully cleared.')
+    return true
   }
 }

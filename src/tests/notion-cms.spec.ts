@@ -4,7 +4,7 @@ import { setTimeout } from 'node:timers/promises'
 import dotenv from 'dotenv'
 import { suite } from 'uvu'
 import * as assert from 'uvu/assert'
-import NotionCMS from '../../dist/index.js'
+import NotionCMS from '../index'
 
 import type { Content, PageContent } from '../types'
 
@@ -69,9 +69,9 @@ TestNotionCMS('taggedCollection', () => {
 
 // query by path
 TestNotionCMS('query by path', () => {
-  const productB = testCMS.queryByPath('/products/category/product-b')
+  const productB: PageContent = testCMS.queryByPath('/products/category/product-b')
   assert.equal(productB.name, 'Product B')
-  const category = testCMS.queryByPath('/products/category')
+  const category: PageContent = testCMS.queryByPath('/products/category')
   assert.equal(category.name, 'Category')
 })
 

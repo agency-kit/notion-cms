@@ -22,6 +22,7 @@ export interface Options {
   notionAPIKey: string
   debug?: boolean
   draftMode?: boolean
+  autoUpdate?: boolean
   refreshTimeout?: number | string // in ms or converted from human readable string
   localCacheDirectory?: string
   rootAlias?: string
@@ -56,11 +57,12 @@ export interface CMS {
   routes: Array<string | Array<string>>
   tags: Array<string>
   tagGroups: Record<string, Array<string>>
-  siteData: Record<string, Page> | string
+  siteData: Record<string, Page>
 }
 
 export interface PageContent {
   _ancestors?: PageContent[]
+  _updateNeeded?: boolean
   name?: string
   path?: string
   url?: string
@@ -138,7 +140,7 @@ export interface PluginExecOptions {
 
 export interface Plugin {
   name: string
-  hook: 'import' | 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree'
+  hook: 'import' | 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree' | '*'
   exec: (context: PluginPassthrough, instanceOptions?: PluginExecOptions) => PluginPassthrough
 }
 
@@ -146,7 +148,7 @@ export interface UnsafePlugin {
   parser: NotionBlocksParser
   name: string
   core: boolean
-  hook: 'parse' | 'import' | 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree'
+  hook: 'parse' | 'import' | 'pre-tree' | 'pre-parse' | 'post-parse' | 'during-tree' | 'post-tree' | '*'
   exec: (context: PluginPassthrough, instanceOptions?: PluginExecOptions) => PluginPassthrough
 }
 

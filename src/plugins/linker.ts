@@ -4,7 +4,7 @@ import NotionCMS from '../notion-cms'
 
 const links: Map<string, string> = new Map()
 
-const ESCAPED_HREF_REGEX = /<a\s+(?:[^>]*?\s+)?href=(["'])\/(.*?)\1/g
+const ESCAPED_HREF_REGEX = /<a\s+(?:[^>]*?\s+)?href=(["'])\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\1/g
 
 export default function () {
   return [{

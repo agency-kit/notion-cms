@@ -5,7 +5,7 @@ import Bottleneck from 'bottleneck'
 import dotenv from 'dotenv'
 import { suite } from 'uvu'
 import * as assert from 'uvu/assert'
-import NotionCMS from '../../dist/index.js'
+import NotionCMS from '../index'
 
 import type { Content, PageContent } from '../types'
 import {
@@ -34,6 +34,9 @@ const testCMS = new NotionCMS({
   draftMode: true,
   limiter,
 })
+
+console.log('limiter test: purging cache')
+testCMS.purgeCache()
 
 await testCMS.fetch()
 
