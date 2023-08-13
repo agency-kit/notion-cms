@@ -1,18 +1,47 @@
-# _The_ Notion CMS ![npm (scoped)](https://img.shields.io/npm/v/@agency-kit/notion-cms) ![workflow](https://github.com/agency-kit/notion-cms/actions/workflows/main.yml/badge.svg) ![npm](https://img.shields.io/npm/dm/@agency-kit/notion-cms) ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/agency-kit/notion-cms)
+<p align="center">
 
-![logo_2](/public/subtle_gltch_logo.png)
+<img src="/public/subtle_gltch_logo.png">
 
-Turn Notion into a full-fledged Headless CMS with this utility set.
+<h1 align="center"><i>The</i> Notion CMS</h1> 
 
-> ### Check out our new WIP docs site: https://www.agencykit.so/notion-cms/guide/
+</p>
 
+<h3 align="center">Leverage the <strong>power</strong> of Notion for your website's content organization and creation,</h3>
+<p align="center">with the <strong>simplicity</strong> of Ghost's Content API.</p>
+
+<p align="center">
+  <a href="https://img.shields.io/npm/v/@agency-kit/notion-cms">
+    <img src="https://img.shields.io/npm/v/@agency-kit/notion-cms" alt="NPM Version" />
+  </a>
+  <a href="https://github.com/agency-kit/notion-cms/actions/workflows/main.yml/badge.svg">
+    <img src="https://github.com/agency-kit/notion-cms/actions/workflows/main.yml/badge.svg" alt="workflow" />
+  </a>
+  <a href="https://img.shields.io/npm/dm/@agency-kit/notion-cms">
+    <img src="https://img.shields.io/npm/dm/@agency-kit/notion-cms" alt="NPM" />
+  </a>
+  <a href="https://img.shields.io/github/commit-activity/m/agency-kit/notion-cms">
+    <img src="https://img.shields.io/github/commit-activity/m/agency-kit/notion-cms" alt="commit activity" />
+  </a>
+</p>
+
+![notion -_  notionCMS  -_ prod](https://github.com/agency-kit/notion-cms/assets/68669571/b5990c57-d3a9-49ce-ba67-02b67f3b545c)
+
+<p align="center">
+  <a href="https://www.agencykit.so/notion-cms/guide/">docs</a> |
+  <a href="https://www.agencykit.so/notion-cms/quickstart/">quickstart</a>
+</p>
+
+## Features 
+
+🏗️  Framework agnostic - it’s just JS.  
 🌲  Build a collection-based CMS tree from your Notion database.  
-🎚️  Leverage database sub-items.  
-⚙️   Geared for Static Site Generation with Notion markdown -> HTML output.  
-🗃️  Content Caching for super fast builds.  
+🎚️  Leverage database structure to control your routing structure.  
+⚙️   Geared for Static Site Generation.  
+📑  Transform Notion blocks → Markdown, plaintext, and (customizable) html.  
+🗃️  Optimized Content Caching for super fast builds.  
 🧩  Plugin ready with some powerful core plugins on the way.  
 🦾  Tagging, filtering, path queries, and tree-walking utilities.  
-⌨️   Totally Typesafe.
+⌨️   Totally Typesafe.  
 
 ## Install
 
@@ -28,21 +57,11 @@ Until recently there wasn't support for sub-pages (sub-items in a database) in N
 
 NotionCMS exists to address each of these issues and provide an excellent developer experience while using Notion as your Content Management System.
 
-## the database structure
+## The Database Structure
 
 In order to make use of NotionCMS, you have to subscribe to a specific database structure. Its an extremely generic design that gives you all the things you need for basic sites but lends flexibility for types of content other than the standard web page, blog post etc.
 
-See the structure in this template https://cooked-shovel-3c3.notion.site/Community-e9fce377adb1425da8ac3ef3acef2bc2
-
-## Features 
-
-- [x] Basic CMS
-- [x] route generation for SSG
-- [x] content caching
-- [x] tag grouping and filtering
-- [x] plugin system and core plugins
-- [x] arbitrary notion properties handling
-- [ ] optimized content caching
+See the structure in this template [this template](https://cooked-shovel-3c3.notion.site/NotionCMS-Quickstart-Database-Template-719f1f9d1547465d96bcd7e80333c831?pvs=4).
 
 ## Basic Usage
 
@@ -56,7 +75,7 @@ const myCoolCMS = new NotionCMS({
 })
 
 // Pull down all Notion content
-await myCoolCMS.fetch()
+await myCoolCMS.pull()
 
 // Access the routes here:
 console.log(myCoolCMS.routes)
@@ -93,15 +112,15 @@ const myAdvancedCMS = new NotionCMS({
   notionAPIKey: process.env.NOTION,
   rootUrl: 'https://mycoolsite.com',
   localCacheDirectory: `${process.cwd()}/localcache/`,
-  refreshTimeout: 1000 * 60 * 60,
+  refreshTimeout: '1 hour',
   plugins: [customPlugin()],
 })
 
-await myAdvancedCMS.fetch()
+await myAdvancedCMS.pull()
 
 ```
 
-See actual plugins for more in depth examples.
+See the full [API reference](https://www.agencykit.so/notion-cms/guide/api/).
 
 ## Some Helper methods
 
