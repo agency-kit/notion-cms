@@ -1,5 +1,15 @@
 # @agency-kit/notion-cms
 
+## 0.9.1
+
+### Patch Changes
+
+- bd28226: Upd: improve terminal output and add quiet flag.
+
+  Fix: [images plugin] make sure existing images don't get overwritten.
+
+  Fix: [linker plugin] proper uuid detection in anchor tags.
+
 ## 0.9.0
 
 ### Minor Changes

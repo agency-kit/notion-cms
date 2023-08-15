@@ -1,7 +1,7 @@
 {
   "name": "@agency-kit/notion-cms",
   "type": "module",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Turn Notion into a full-fledged headless content management system.",
   "author": "Jacob Milhorn",
   "license": "MIT",
