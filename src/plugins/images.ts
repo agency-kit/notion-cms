@@ -21,7 +21,9 @@ const IMAGE_SOURCE_MATCH = /<img[^>]*src=['|"](https?:\/\/[^'|"]+)(?:['|"])/ig
 function multiStringMatch(stringA: unknown, stringB: unknown): Boolean {
   if (typeof stringA !== 'string' || typeof stringB !== 'string' || !stringA || !stringB)
     return false
-  return Boolean(stringA.match(IMAGE_FILE_MATCH_REGEX) && stringB.match(IMAGE_FILE_MATCH_REGEX))
+  const matchA = stringA.match(IMAGE_FILE_MATCH_REGEX)
+  const matchB = stringB.match(IMAGE_FILE_MATCH_REGEX)
+  return Boolean(matchA && matchB && (matchA[0] === matchB[0]))
 }
 
 export default function ({

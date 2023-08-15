@@ -26,6 +26,7 @@ export interface Options {
   refreshTimeout?: number | string // in ms or converted from human readable string
   localCacheDirectory?: string
   rootAlias?: string
+  quiet?: boolean
   rootUrl?: string | URL | undefined // Used to generate full path links,
   limiter?: { schedule: Function }
   plugins?: Array<Plugin | UnsafePlugin>
