@@ -13,7 +13,8 @@ import _ from 'lodash'
 import type { AsyncCallbackFn, WalkNode } from 'walkjs'
 import { AsyncWalkBuilder, WalkBuilder } from 'walkjs'
 import humanInterval from 'human-interval'
-import { spinner } from '@clack/prompts'
+import { log, spinner } from '@clack/prompts'
+import kleur from 'kleur'
 import type {
   CMS,
   Content,
@@ -377,7 +378,7 @@ export default class NotionCMS {
           // Definitely grab content if there is no cache.
           if (pageContent._updateNeeded || !cachedState) {
             if (!this.quietMode && pageContent.path)
-              console.log(`[updating]: ${pageContent.path}`)
+              clackSpinner.start(kleur.blue(`[ncms][updating]: ${pageContent.path}`))
             const blocks = await this._pullPageContent(pageContent._notion.id)
             if (!blocks)
               return
@@ -396,9 +397,12 @@ export default class NotionCMS {
                 ...(!cachedPage.coverImage && { coverImage: cachedPage.content?.html.match(COVER_IMAGE_REGEX)?.[1] }),
                 _ancestors: this._gatherNodeAncestors(node),
               })
+              if (!this.quietMode && pageContent.path)
+                clackSpinner.start(kleur.yellow(`[ncms][using cache]: ${pageContent.path}`))
             }
           }
           else {
+            clackSpinner.stop(kleur.red('[ncms]: aborted due to fetch error.'))
             throw new Error(`ncms: error when updating page content. No page found for ${node.key || 'undetermined node key'}`)
           }
 
@@ -409,6 +413,8 @@ export default class NotionCMS {
           // We only want access to ancestors for plugins, otherwise it creates circular ref headaches.
           delete pageContent._ancestors
           delete pageContent._updateNeeded
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          clackSpinner.stop(kleur.blue(`[ncms]: updated@ ${pageContent.path}`))
         },
       })
       .withRootObjectCallbacks(false)
@@ -555,7 +561,8 @@ export default class NotionCMS {
       && (Date.now() < cachedCMS.lastUpdateTimestamp + _.toNumber(this.refreshTimeout)))
         && !optionsHaveChanged))
 
-    clackSpinner.start('🛸 ncms: pulling your content from Notion...')
+    if (!this.quietMode)
+      log.step(kleur.red('[ncms]: pulling your content from Notion...🛸'))
     try {
       const cmsOutput = await this._getDb(this.cms, cachedCMS)
       if (!cmsOutput)
@@ -565,10 +572,12 @@ export default class NotionCMS {
       this.cms = await this._getPageContent(this.cms, cachedCMS)
       this.cms.stages.push('complete')
       this.export()
-      clackSpinner.stop('ncms: mission complete! 👽')
+      if (!this.quietMode)
+        log.step(kleur.green('[ncms]: mission complete! 👽'))
     }
     catch (e) {
-      clackSpinner.stop('ncms: Something went wrong. Mission aborted.')
+      if (!this.quietMode)
+        clackSpinner.stop(kleur.red('[ncms]: Something went wrong. Mission aborted.'))
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       console.error(`ncms error: ${e}`)
     }
