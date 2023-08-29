@@ -146,3 +146,7 @@ myCoolCMS.walk(node => console.log(node), '/partial/path/to/start')
 // for async callbacks
 await myCoolCMS.asyncWalk(async node => await asynchronousFunc())
 ```
+
+## Project Stats
+
+![Alt](https://repobeats.axiom.co/api/embed/c2535fbb6cbc2731c212c332d5bc6cd695c32e0a.svg "Repobeats analytics image")
