@@ -128,7 +128,7 @@ export default class NotionBlocksMarkdownParser {
 
         return markdown
       }, '')
-      .concat(EOL_MD)
+      .concat(EOL_MD).replace(/\t/g, '  ')
   }
 
   parseLinkPreview(linkPreviewBlock: LinkPreviewBlock): string {
