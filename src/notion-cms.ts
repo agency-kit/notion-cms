@@ -274,7 +274,7 @@ export default class NotionCMS {
         || !node?.parent?.key || node?.parent?.key === 'siteData')
   }
 
-  static _createCMSWalker(cb: (node: ExtendedPageContent) => void): WalkBuilder {
+  static createCMSWalker(cb: (node: ExtendedPageContent) => void): WalkBuilder {
     return new WalkBuilder()
       .withCallback({
         filters: [(node: WalkNode) => NotionCMS._isPageContentObject(node)],
