@@ -58,6 +58,8 @@ const STEADY_PROPS = [
   'sub-page',
 ]
 
+const ONE_MINUTE_IN_MS = 60000
+
 const clackSpinner = spinner()
 
 export default class NotionCMS {
@@ -530,8 +532,14 @@ export default class NotionCMS {
           })
           if (cachedState && pageContent.path && !this.withinRefreshTimeout) {
             const cachedPage = this._queryByPath(pageContent.path, cachedState?.siteData)
-            pageContent._updateNeeded = this.autoUpdate
-              && (update._notion?.last_edited_time !== cachedPage?._notion?.last_edited_time)
+            const pageHasUpdated = update._notion?.last_edited_time !== cachedPage?._notion?.last_edited_time
+            const currentTime = new Date().getTime()
+            const lastEditedTime = new Date(cachedPage?._notion?.last_edited_time as string).getTime()
+            // Notion rounds last_edited_time to the nearest minute.
+            // This latent period is used to make sure immediate subsequent content updates in Notion are always pulled.
+            // After the latent period, we can rely on the comparison between last_edited_time again reliably.
+            const isWithinLatentPeriod = currentTime - lastEditedTime >= ONE_MINUTE_IN_MS
+            pageContent._updateNeeded = this.autoUpdate && (pageHasUpdated || isWithinLatentPeriod)
           }
           if (node.key && typeof node.key === 'string' && pageContent.tags && pageContent.path)
             this._buildTagGroups(pageContent.tags, pageContent.path, stateWithDb)
