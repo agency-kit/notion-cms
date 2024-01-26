@@ -1,4 +1,7 @@
 import type { PageContent } from '../types'
+import NotionBlocksMarkdownParser from '../notion-blocks-md-parser'
+
+const parser = new NotionBlocksMarkdownParser()
 
 export default function () {
   return {
@@ -12,12 +15,16 @@ export default function () {
         description: '',
       }
       if (copyOfContext.otherProps?.metaTitle
-         && copyOfContext.otherProps?.metaTitle.type === 'rich_text')
-        copyOfContext.meta.title = copyOfContext.otherProps?.metaTitle?.rich_text[0]?.plain_text
+         && copyOfContext.otherProps?.metaTitle.type === 'rich_text') {
+        copyOfContext.meta.title
+            = parser.parseRichTexts(copyOfContext.otherProps.metaTitle.rich_text)
+      }
 
       if (copyOfContext.otherProps?.metaDescription
-         && copyOfContext.otherProps?.metaDescription.type === 'rich_text')
-        copyOfContext.meta.description = copyOfContext.otherProps?.metaDescription?.rich_text[0]?.plain_text
+         && copyOfContext.otherProps?.metaDescription.type === 'rich_text') {
+        copyOfContext.meta.description
+          = parser.parseRichTexts(copyOfContext.otherProps?.metaDescription?.rich_text)
+      }
 
       return copyOfContext
     },
