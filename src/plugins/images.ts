@@ -17,6 +17,7 @@ const IMAGE_FILE_MATCH_REGEX = /(.*)X-Amz-Algorithm/g
 const IMAGE_CACHE_FILENAME = 'ncms-image-cache.json'
 const GENERIC_MATCH = /\b(https?:\/\/[\w_#&?.\/-]*?\.(?:png|jpe?g|svg|ico))(?=[`'")\]])/ig
 const IMAGE_SOURCE_MATCH = /<img[^>]*src=['|"](https?:\/\/[^'|"]+)(?:['|"])/ig
+const OBJECT_PDF_MATCH = /<object[^>]+data=(?:'|")(https?:\/\/[^'"\s]+\.pdf\?[^'"\s]*)?/ig
 
 function multiStringMatch(stringA: unknown, stringB: unknown): Boolean {
   if (typeof stringA !== 'string' || typeof stringB !== 'string' || !stringA || !stringB)
@@ -54,7 +55,7 @@ export default function ({
     imageCache = {}
   }
 
-  async function writeOutImage(imageUrl: string, existingImageFile: ImageCacheEntry): Promise<string> {
+  async function writeOutAsset(imageUrl: string, existingImageFile: ImageCacheEntry, isPdf: boolean): Promise<string> {
     let filename = ''
     if (existingImageFile)
       return existingImageFile.filename as string
@@ -62,20 +63,28 @@ export default function ({
     const arrayBuffer = await response.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
     const fileType = await fileTypeFromBuffer(buffer)
-    if (fileType?.ext) {
-      const id = nanoid(6)
-      filename = `${id}.remote.${globalExtension}`
-      const outputFilePath = `${imageCacheDirectory}/remote/${filename}`
-      const imageBuffer = sharp(buffer)
-      const webPBuffer = await imageBuffer[globalExtension]({
-        quality: compression,
-        nearLossless: true,
-        effort: 6,
-      }).toBuffer()
-      const writeStream = fs.createWriteStream(outputFilePath)
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      writeStream.on('error', err => console.warn(`ncms-plugin-images: failed to write image file: ${err}`))
-      writeStream.write(webPBuffer)
+
+    if (isPdf) {
+      filename = `pdf-${nanoid(6)}.remote.pdf`
+      const outputPath = `${imageCacheDirectory}/remote/${filename}`
+      fs.writeFileSync(outputPath, buffer)
+    }
+    else {
+      if (fileType?.ext) {
+        const id = nanoid(6)
+        filename = `${id}.remote.${globalExtension}`
+        const outputFilePath = `${imageCacheDirectory}/remote/${filename}`
+        const imageBuffer = sharp(buffer)
+        const webPBuffer = await imageBuffer[globalExtension]({
+          quality: compression,
+          nearLossless: true,
+          effort: 6,
+        }).toBuffer()
+        const writeStream = fs.createWriteStream(outputFilePath)
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        writeStream.on('error', err => console.warn(`ncms-plugin-images: failed to write image file: ${err}`))
+        writeStream.write(webPBuffer)
+      }
     }
     return filename
   }
@@ -87,15 +96,17 @@ export default function ({
     })[0]
   }
 
-  async function processImage(
+  async function processAsset(
     path: string,
     imageUrl: string,
     updator: { update: Content | string },
-    debug?: boolean): Promise<void> {
+    isPdf: boolean,
+    debug?: boolean,
+  ): Promise<void> {
     if (imageUrl && path) {
       let filename = ''
       try {
-        filename = await writeOutImage(imageUrl, detectExisting(path, imageUrl))
+        filename = await writeOutAsset(imageUrl, detectExisting(path, imageUrl), isPdf)
       }
       catch (e) {
         if (debug)
@@ -130,47 +141,52 @@ export default function ({
     core: true,
     exec: async (context: PageContent, options: PluginExecOptions) => {
       const copyOfContext = structuredClone(context)
-      if (!copyOfContext.path)
-        return
-
-      const matchables = [
-        GENERIC_MATCH,
-        IMAGE_SOURCE_MATCH,
-        ...customMatchers,
-      ]
-      if (!imageCache[copyOfContext.path])
-        imageCache[copyOfContext.path] = [] as ImageCacheEntry[]
-      const contents = {
-        update: copyOfContext.content as Content,
-      }
-      const coverImage = {
-        update: copyOfContext.coverImage as string,
-      }
-      // Must run all async in series so that we don't end up with duplicates
-      for (const match of matchables) {
+      if (copyOfContext._updateNeeded) {
         if (!copyOfContext.path)
           return
-        const path = copyOfContext.path
-        const matched = (contents.update && Array.from(contents.update.html.matchAll(match), m => m[1])) || []
-        const matchedCoverImages = (coverImage.update && [coverImage.update]) || []
-        for (const imageUrl of matched)
-          await processImage(path, imageUrl, contents, options.debug)
 
-        for (const imageUrl of matchedCoverImages)
-          await processImage(path, imageUrl, coverImage, options.debug)
-      }
-      copyOfContext.content = contents.update
-      copyOfContext.coverImage = coverImage.update
-      try {
-        if (!fs.existsSync(`${imageCacheDirectory}/remote`))
-          fs.mkdirSync(`${imageCacheDirectory}/remote`)
-        fs.writeFileSync(`${imageCacheDirectory}/remote/${IMAGE_CACHE_FILENAME}`, JSON.stringify(imageCache))
-        if (options.debug)
-          fs.writeFileSync('debug/images.json', JSON.stringify(imageCache))
-      }
-      catch (e) {
-        if (options.debug)
-          console.warn(e, 'ncms-plugin-images: error writing to image cache.')
+        const matchables = [
+          GENERIC_MATCH,
+          IMAGE_SOURCE_MATCH,
+          OBJECT_PDF_MATCH,
+          ...customMatchers,
+        ]
+        if (!imageCache[copyOfContext.path])
+          imageCache[copyOfContext.path] = [] as ImageCacheEntry[]
+        const contents = {
+          update: copyOfContext.content as Content,
+        }
+        const coverImage = {
+          update: copyOfContext.coverImage as string,
+        }
+        // Must run all async in series so that we don't end up with duplicates
+        for (const match of matchables) {
+          if (!copyOfContext.path)
+            return
+          const path = copyOfContext.path
+          const matched = (contents.update && Array.from(contents.update.html.matchAll(match), m => m[1])) || []
+          const matchedCoverImages = (coverImage.update && [coverImage.update]) || []
+          for (const imageUrl of matched) {
+            const isPdf = imageUrl.includes('.pdf')
+            await processAsset(path, imageUrl, contents, isPdf, options.debug)
+          }
+
+          for (const imageUrl of matchedCoverImages)
+            await processAsset(path, imageUrl, coverImage, false, options.debug)
+        }
+        copyOfContext.content = contents.update
+        copyOfContext.coverImage = coverImage.update
+        try {
+          if (!fs.existsSync(`${imageCacheDirectory}/remote`))
+            fs.mkdirSync(`${imageCacheDirectory}/remote`)
+          fs.writeFileSync(`${imageCacheDirectory}/remote/${IMAGE_CACHE_FILENAME}`, JSON.stringify(imageCache))
+          if (options.debug)
+            fs.writeFileSync('debug/images.json', JSON.stringify(imageCache))
+        }
+        catch (e) {
+          if (options.debug)
+            console.warn(e, 'ncms-plugin-images: error writing to image cache.')
+        }
       }
       return copyOfContext
     },
