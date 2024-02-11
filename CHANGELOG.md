@@ -1,5 +1,27 @@
 # @agency-kit/notion-cms
 
+## 0.10.0
+
+### Minor Changes
+
+- 8862d40: Fix: image cache plugin will now only run when a page needs updated (not using cache).
+
+  New: cache PDFs using the image plugin. Long term this will likely be a unified plugin for fetching/caching all AWS S3 hosted Notion assets.
+
+### Patch Changes
+
+- bef414e: Fix: Keep terminal logging mechanism from swallowing important error messages.
+
+  Fix: Throw an error when `rootAlias` is non-existant in Notion database.
+
+  Fix: Show warning when there are multiple pages at the root level AND a `rootAlias` is set (you probably don't want that).
+
+  Fix: Keep from failing when in quiet mode.
+
+  Upd: Improve bundle size a tiny amount by switching terminal colors to picocolors.
+
+- 26dccd0: Fix: maintain proper spacing in codeblock renders.
+
 ## 0.9.1
 
 ### Patch Changes
