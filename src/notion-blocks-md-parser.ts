@@ -257,7 +257,7 @@ ${(codeBlock.code.rich_text[0] as RichTextText).text.content}
     const { url, caption } = this.parseFile(pdfBlock.pdf)
     return `
 <figure>
-  <object data='${url}' type='application/pdf'></object>
+  <object data='${url}' type='application/pdf'><p>Your browser does not support PDFs. <a href='${url}' download>Download the PDF</a>.</p></object>
   <figcaption>${caption}</figcaption>
 </figure>
 `.concat(EOL_MD)
